@@ -2,7 +2,7 @@ import Word from '../models/Word.js';
 
 export const createWord = async (req, res) => {
     try {
-        const { nameRu, nameTatar, transcription, descriptionRu } = req.body;
+        const { nameRu, nameEn, nameTatar, transcription, descriptionRu } = req.body;
 
         const exists = await Word.findOne({ nameRu });
 
@@ -14,6 +14,7 @@ export const createWord = async (req, res) => {
 
         const word = await Word.create({
             nameRu,
+            nameEn,
             nameTatar,
             transcription,
             descriptionRu
