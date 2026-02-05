@@ -39,7 +39,8 @@ export const register = async (req, res) => {
             role: 'user'
         });
 
-        res.json({ message: 'Регистрация успешна' });
+        const token = jwt.sign({ id: User._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        res.json({ message: 'Регистрация успешна', token });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Ошибка регистрации' });
@@ -47,9 +48,11 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-    const { email, password } = req.body;
+    const { identifier, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({
+        $or: [{ email: identifier }, { username: identifier }]
+    });
     if (!user) {
         return res.status(400).json({ message: 'Неверные данные' });
     }
