@@ -1,11 +1,10 @@
-import { Router } from 'express';
-
 import authRoutes from './auth.routes.js';
 import recognizeRoutes from './recognize.routes.js';
 import dictionaryRoutes from './dictionary.routes.js';
 import rankingRoutes from './ranking.routes.js';
 import achievementsRoutes from './achievements.routes.js';
 import adminWordRoutes from './admin.words.routes.js';
+import { Router } from 'express';
 
 const router = Router();
 

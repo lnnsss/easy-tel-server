@@ -2,11 +2,11 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 
 export default async function seedAdmin() {
-    const adminEmail = 'admin@mail.com';
+    const adminEmail = 'admin@gmail.com';
 
     const exists = await User.findOne({ email: adminEmail });
     if (exists) {
-        console.log('👮 Администратор уже существует');
+        console.log('Администратор уже существует');
         return;
     }
 
@@ -21,5 +21,5 @@ export default async function seedAdmin() {
         role: 'admin'
     });
 
-    console.log('✅ Администратор создан: admin@mail.com / admin123');
+    console.log('Администратор создан: admin@gmail.com / admin123');
 }

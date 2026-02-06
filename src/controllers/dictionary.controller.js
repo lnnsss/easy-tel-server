@@ -4,10 +4,6 @@ import Word from '../models/Word.js';
 import { getRank } from '../utils/ranking.js';
 import { checkAchievements } from '../utils/achievements.js';
 
-/**
- * ➕ Добавить слово пользователю
- * POST /api/dictionary/add
- */
 export const addToDictionary = async (req, res) => {
     const { wordId, userPhoto } = req.body;
 

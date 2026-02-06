@@ -62,7 +62,7 @@ export const recognizeImage = async (req, res) => {
         return res.status(200).json({
             success: true,
             data: {
-                id: foundWord._id, // ВАЖНО: передаем ID для сохранения
+                id: foundWord._id,
                 nameRu: foundWord.nameRu,
                 nameEn: foundWord.nameEn,
                 nameTatar: foundWord.nameTatar,

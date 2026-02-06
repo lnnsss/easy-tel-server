@@ -1,10 +1,10 @@
 import express from 'express';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 
 import indexRoutes from './routes/index.routes.js';
 import seedAdmin from './utils/seedAdmin.js';
@@ -13,14 +13,10 @@ dotenv.config();
 
 const app = express();
 
-/* =======================
-   GLOBAL MIDDLEWARE
-======================= */
-
 app.use(express.json());
 
 app.use(cors({
-    origin: '*', // для dev, позже можно ограничить
+    origin: '*', // TODO для dev, позже ограничу
 }));
 
 app.use(helmet());
@@ -39,7 +35,7 @@ app.use('/api', indexRoutes);
 mongoose.connect(process.env.MONGO_URI)
     .then(async () => {
         console.log('✅ MongoDB connected');
-        await seedAdmin(); // 👮 создаём админа, если нет
+        await seedAdmin(); // создаём админа, если нет
     })
     .catch(err => {
         console.error('❌ MongoDB error:', err);

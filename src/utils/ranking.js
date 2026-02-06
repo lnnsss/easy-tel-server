@@ -4,5 +4,6 @@ export const getRank = (count) => {
     if (count <= 30) return 'Серебро I';
     if (count <= 40) return 'Серебро II';
     if (count <= 50) return 'Золото I';
+    if (count <= 75) return 'Золото II';
     return 'Легенда';
 };

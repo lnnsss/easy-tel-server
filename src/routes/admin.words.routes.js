@@ -1,6 +1,6 @@
-import { Router } from 'express';
 import auth from '../middleware/auth.middleware.js';
 import admin from '../middleware/admin.middleware.js';
+import { Router } from 'express';
 import {
     createWord,
     getWords,
