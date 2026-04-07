@@ -15,6 +15,13 @@ const parseBoolean = (value, fallback = true) => {
     return fallback;
 };
 
+const normalizePinnedMode = (value) => {
+    const normalized = String(value || '').trim();
+    if (normalized === 'dismiss_once') return 'dismiss_once';
+    if (normalized === 'confirm_hide') return 'confirm_hide';
+    return 'persistent';
+};
+
 const validateAndNormalizeQuestions = (questions = []) => {
     if (!Array.isArray(questions) || questions.length === 0) {
         throw new Error('Добавьте хотя бы один вопрос');
@@ -149,7 +156,10 @@ export const createCourse = async (req, res) => {
             status = 'draft',
             order = 0,
             cover = '',
-            isActive = true
+            isActive = true,
+            isPinnedHome = false,
+            pinnedHomeText = '',
+            pinnedHomeMode = 'persistent'
         } = req.body;
 
         if (!String(title || '').trim()) {
@@ -167,8 +177,18 @@ export const createCourse = async (req, res) => {
             status: status === 'published' ? 'published' : 'draft',
             order: Number(order) || 0,
             cover: String(cover || ''),
-            isActive: parseBoolean(isActive, true)
+            isActive: parseBoolean(isActive, true),
+            isPinnedHome: parseBoolean(isPinnedHome, false),
+            pinnedHomeText: String(pinnedHomeText || '').trim(),
+            pinnedHomeMode: normalizePinnedMode(pinnedHomeMode)
         });
+
+        if (course.isPinnedHome) {
+            await Course.updateMany(
+                { _id: { $ne: course._id } },
+                { $set: { isPinnedHome: false, pinnedHomeText: '' } }
+            );
+        }
 
         return res.status(201).json(course);
     } catch (err) {
@@ -200,9 +220,24 @@ export const updateCourse = async (req, res) => {
         if (payload.cover !== undefined) payload.cover = String(payload.cover || '');
         if (payload.status !== undefined) payload.status = payload.status === 'published' ? 'published' : 'draft';
         if (payload.isActive !== undefined) payload.isActive = parseBoolean(payload.isActive, true);
+        if (payload.isPinnedHome !== undefined) payload.isPinnedHome = parseBoolean(payload.isPinnedHome, false);
+        if (payload.pinnedHomeText !== undefined) payload.pinnedHomeText = String(payload.pinnedHomeText || '').trim();
+        if (payload.pinnedHomeMode !== undefined) payload.pinnedHomeMode = normalizePinnedMode(payload.pinnedHomeMode);
+
+        if (payload.isPinnedHome === false) {
+            payload.pinnedHomeText = '';
+            payload.pinnedHomeMode = 'persistent';
+        }
 
         const course = await Course.findByIdAndUpdate(req.params.id, payload, { new: true }).populate('categoryId');
         if (!course) return res.status(404).json({ message: 'Курс не найден' });
+
+        if (course.isPinnedHome) {
+            await Course.updateMany(
+                { _id: { $ne: course._id } },
+                { $set: { isPinnedHome: false, pinnedHomeText: '' } }
+            );
+        }
 
         return res.json(course);
     } catch (err) {

@@ -3,6 +3,7 @@ import auth from '../middleware/auth.middleware.js';
 import {
     getCourses,
     getCourseById,
+    getPinnedCourse,
     getCourseTopicById,
     submitTopicQuiz,
     getCoursesProgress,
@@ -14,6 +15,7 @@ const router = Router();
 router.use(auth);
 
 router.get('/', getCourses);
+router.get('/pinned', getPinnedCourse);
 router.get('/progress', getCoursesProgress);
 router.get('/analytics', getCoursesAnalytics);
 router.get('/:id', getCourseById);

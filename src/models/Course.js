@@ -7,7 +7,14 @@ const CourseSchema = new mongoose.Schema({
     status: { type: String, enum: ['draft', 'published'], default: 'draft' },
     order: { type: Number, default: 0 },
     cover: { type: String, default: '' },
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true },
+    isPinnedHome: { type: Boolean, default: false },
+    pinnedHomeText: { type: String, default: '' },
+    pinnedHomeMode: {
+        type: String,
+        enum: ['dismiss_once', 'persistent', 'confirm_hide'],
+        default: 'persistent'
+    }
 }, { timestamps: true });
 
 CourseSchema.index({ categoryId: 1, order: 1, createdAt: 1 });

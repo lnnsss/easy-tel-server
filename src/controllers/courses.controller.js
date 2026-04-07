@@ -166,6 +166,30 @@ export const getCourseById = async (req, res) => {
     }
 };
 
+export const getPinnedCourse = async (_req, res) => {
+    try {
+        const course = await Course.findOne({
+            isPinnedHome: true,
+            status: 'published',
+            isActive: true
+        }).select('_id title pinnedHomeText pinnedHomeMode');
+
+        if (!course) return res.json({ course: null });
+
+        return res.json({
+            course: {
+                _id: course._id,
+                title: course.title,
+                pinnedHomeText: String(course.pinnedHomeText || '').trim() || `Рекомендуем пройти курс: ${course.title}`,
+                pinnedHomeMode: course.pinnedHomeMode || 'persistent'
+            }
+        });
+    } catch (err) {
+        console.error('getPinnedCourse error', err);
+        return res.status(500).json({ message: 'Ошибка загрузки закрепленного курса' });
+    }
+};
+
 export const getCourseTopicById = async (req, res) => {
     try {
         const { id: courseId, topicId } = req.params;
