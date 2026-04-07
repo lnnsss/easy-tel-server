@@ -22,6 +22,7 @@ const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 const GOOGLE_AUTH_BASE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
+const GOOGLE_AVATAR_HOST_HINT = 'googleusercontent.com';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsRoot = path.resolve(__dirname, '..', 'uploads');
@@ -418,7 +419,8 @@ export const googleAuthCallback = async (req, res) => {
             email_verified: emailVerified,
             given_name: givenName,
             family_name: familyName,
-            name
+            name,
+            picture
         } = userInfoRes.data || {};
 
         if (!email) return res.status(400).send('Google не вернул email');
@@ -443,14 +445,31 @@ export const googleAuthCallback = async (req, res) => {
                 username,
                 firstName: derivedFirstName,
                 lastName: derivedLastName,
+                avatarUrl: picture || null,
                 password: passwordHash,
                 role: 'user'
             });
-        } else if (!user.emailVerified) {
-            user.emailVerified = true;
-            user.emailVerificationCodeHash = null;
-            user.emailVerificationExpiresAt = null;
-            await user.save();
+        } else {
+            let requiresSave = false;
+
+            if (!user.emailVerified) {
+                user.emailVerified = true;
+                user.emailVerificationCodeHash = null;
+                user.emailVerificationExpiresAt = null;
+                requiresSave = true;
+            }
+
+            const hasGooglePicture = typeof picture === 'string' && picture.trim().length > 0;
+            const hasLocalAvatar = typeof user.avatarUrl === 'string' && user.avatarUrl.startsWith('/uploads/');
+            const hasGoogleAvatar = typeof user.avatarUrl === 'string' && user.avatarUrl.includes(GOOGLE_AVATAR_HOST_HINT);
+
+            // Обновляем аватар из Google, если пользователь не ставил локальный вручную.
+            if (hasGooglePicture && (!user.avatarUrl || (!hasLocalAvatar && hasGoogleAvatar))) {
+                user.avatarUrl = picture;
+                requiresSave = true;
+            }
+
+            if (requiresSave) await user.save();
         }
 
         const token = createJwtToken(user);
