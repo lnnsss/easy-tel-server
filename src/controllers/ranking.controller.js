@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import { ensureLegacyPoints } from '../utils/userProgress.js';
 
 export const getTopRanking = async (_, res) => {
     try {
@@ -14,10 +15,11 @@ export const getTopRanking = async (_, res) => {
                     lastName: 1,
                     avatarUrl: 1,
                     rank: 1,
+                    totalPoints: { $ifNull: ['$totalPoints', 0] },
                     wordsCount: { $size: { $ifNull: ["$dictionary", []] } }
                 }
             },
-            { $sort: { wordsCount: -1 } },
+            { $sort: { totalPoints: -1, wordsCount: -1 } },
             { $limit: 5 }
         ]);
 
@@ -31,6 +33,10 @@ export const getTopRanking = async (_, res) => {
 export const getUserRank = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
+        if (user) {
+            ensureLegacyPoints(user);
+            await user.save();
+        }
         res.json({ rank: user?.rank || 'Новичок' });
     } catch (err) {
         res.status(500).json({ rank: 'Ошибка' });

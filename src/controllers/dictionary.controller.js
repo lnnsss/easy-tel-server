@@ -1,11 +1,10 @@
 import UserWord from '../models/UserWord.js';
 import User from '../models/User.js';
-import Word from '../models/Word.js';
-import { getRank } from '../utils/ranking.js';
 import { checkAchievements } from '../utils/achievements.js';
+import { addScanPoints, ensureLegacyPoints } from '../utils/userProgress.js';
 
 export const addToDictionary = async (req, res) => {
-    const { wordId, userPhoto } = req.body;
+    const { wordId } = req.body;
 
     const exists = await UserWord.findOne({
         user: req.user.id,
@@ -18,14 +17,12 @@ export const addToDictionary = async (req, res) => {
 
     const userWord = await UserWord.create({
         user: req.user.id,
-        word: wordId,
-        userPhoto
+        word: wordId
     });
 
     const user = await User.findById(req.user.id);
     user.dictionary.push(userWord._id);
-
-    user.rank = getRank(user.dictionary.length);
+    addScanPoints(user, 1);
     user.achievements = checkAchievements(user.dictionary.length);
 
     await user.save();
@@ -34,6 +31,12 @@ export const addToDictionary = async (req, res) => {
 };
 
 export const getDictionary = async (req, res) => {
+    const user = await User.findById(req.user.id).select('dictionary scanPoints studyPoints totalPoints rank');
+    if (user) {
+        ensureLegacyPoints(user);
+        await user.save();
+    }
+
     const words = await UserWord.find({ user: req.user.id })
         .populate('word');
 

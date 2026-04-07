@@ -15,6 +15,8 @@ import {
     validateUsername
 } from '../utils/authValidation.js';
 import { sendPasswordResetEmail, sendVerificationCodeEmail } from '../services/mailer.js';
+import { ensureLegacyPoints } from '../utils/userProgress.js';
+import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -557,5 +559,17 @@ export const profile = async (req, res) => {
             populate: { path: 'word' }
         });
 
-    res.json(user);
+    if (!user) {
+        return res.status(404).json({ message: 'Пользователь не найден' });
+    }
+
+    ensureLegacyPoints(user);
+    await user.save();
+
+    const analytics = await getUserCourseAnalytics(req.user.id);
+
+    res.json({
+        ...user.toObject(),
+        analytics
+    });
 };

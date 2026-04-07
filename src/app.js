@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 
 import indexRoutes from './routes/index.routes.js';
 import seedAdmin from './utils/seedAdmin.js';
+import { migrateUserPoints } from './utils/migrateUserPoints.js';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ mongoose.connect(process.env.MONGO_URI)
     .then(async () => {
         console.log('MongoDB connected');
         await seedAdmin(); // создаём админа, если нет
+        await migrateUserPoints();
     })
     .catch(err => {
         console.error('MongoDB error:', err);

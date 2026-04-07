@@ -23,8 +23,20 @@ const UserSchema = new mongoose.Schema({
         ref: 'UserWord'
     }],
 
+    scanPoints: { type: Number, default: 0 },
+    studyPoints: { type: Number, default: 0 },
+    totalPoints: { type: Number, default: 0 },
+
     rank: { type: String, default: 'Бронза I' },
     achievements: { type: [String], default: [] },
+    courseAchievements: {
+        type: [{
+            courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
+            title: { type: String, required: true },
+            awardedAt: { type: Date, default: Date.now }
+        }],
+        default: []
+    },
 
     streak: { type: Number, default: 0 },
     lastLogin: Date
