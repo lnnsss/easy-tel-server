@@ -5,12 +5,16 @@ import FormData from "form-data";
 
 dotenv.config();
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000/predict";
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
 
 export const recognizeImage = async (req, res) => {
     console.log("=== START recognizeImage ===");
 
     try {
+        if (!ML_SERVICE_URL) {
+            return res.status(500).json({ message: "Не настроен ML_SERVICE_URL в .env" });
+        }
+
         if (!req.file) {
             return res.status(400).json({ message: "Загрузите фото" });
         }

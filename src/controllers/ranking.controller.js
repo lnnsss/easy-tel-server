@@ -12,6 +12,7 @@ export const getTopRanking = async (_, res) => {
                     username: 1,
                     firstName: 1,
                     lastName: 1,
+                    avatarUrl: 1,
                     rank: 1,
                     wordsCount: { $size: { $ifNull: ["$dictionary", []] } }
                 }

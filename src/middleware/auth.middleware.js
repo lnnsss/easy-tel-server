@@ -14,13 +14,16 @@ export default async function auth(req, res, next) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         const user = await User.findById(decoded.id)
-            .select('_id role');
+            .select('_id role tokenVersion');
 
         if (!user) {
             return res.status(401).json({ message: 'Пользователь не найден' });
         }
 
-        // 👇 КЛЮЧЕВОЙ МОМЕНТ
+        if ((decoded.tv || 0) !== (user.tokenVersion || 0)) {
+            return res.status(401).json({ message: 'Сессия устарела. Войдите снова' });
+        }
+
         req.user = {
             id: user._id,
             role: user.role
