@@ -7,6 +7,7 @@ import adminWordRoutes from './admin.words.routes.js';
 import coursesRoutes from './courses.routes.js';
 import adminLearningRoutes from './admin.learning.routes.js';
 import adminUsersRoutes from './admin.users.routes.js';
+import usersRoutes from './users.routes.js';
 import { Router } from 'express';
 
 const router = Router();
@@ -20,5 +21,6 @@ router.use('/admin', adminWordRoutes);
 router.use('/admin', adminUsersRoutes);
 router.use('/admin/learning', adminLearningRoutes);
 router.use('/courses', coursesRoutes);
+router.use('/users', usersRoutes);
 
 export default router;
