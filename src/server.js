@@ -13,3 +13,11 @@ initSocket(server);
 server.listen(PORT, () => {
     console.log(`Server is listening on port ${PORT}`);
 });
+
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
