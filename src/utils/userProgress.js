@@ -72,3 +72,57 @@ export const calculateDailyStreak = (dateKeys = []) => {
 
     return streak;
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const toUtcDayStart = (dateValue = new Date()) => {
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return null;
+    date.setUTCHours(0, 0, 0, 0);
+    return date;
+};
+
+export const normalizeUserStreak = (user, now = new Date()) => {
+    if (!user) return user;
+
+    const today = toUtcDayStart(now);
+    const last = toUtcDayStart(user.lastStreakDate);
+
+    if (!today || !last) {
+        user.streak = 0;
+        return user;
+    }
+
+    const diffDays = Math.floor((today.getTime() - last.getTime()) / DAY_MS);
+    if (diffDays > 1) {
+        user.streak = 0;
+    }
+
+    return user;
+};
+
+export const applyDailyStreakOnScan = (user, now = new Date()) => {
+    if (!user) return user;
+
+    const today = toUtcDayStart(now);
+    const last = toUtcDayStart(user.lastStreakDate);
+
+    if (!today || !last) {
+        user.streak = 1;
+        user.lastStreakDate = now;
+        return user;
+    }
+
+    const diffDays = Math.floor((today.getTime() - last.getTime()) / DAY_MS);
+
+    if (diffDays <= 0) {
+        user.streak = Math.max(Number(user.streak) || 0, 1);
+    } else if (diffDays === 1) {
+        user.streak = (Number(user.streak) || 0) + 1;
+    } else {
+        user.streak = 1;
+    }
+
+    user.lastStreakDate = now;
+    return user;
+};

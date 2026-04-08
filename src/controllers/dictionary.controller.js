@@ -1,7 +1,7 @@
 import UserWord from '../models/UserWord.js';
 import User from '../models/User.js';
 import { checkAchievements } from '../utils/achievements.js';
-import { addScanPoints, ensureLegacyPoints } from '../utils/userProgress.js';
+import { addScanPoints, applyDailyStreakOnScan, ensureLegacyPoints } from '../utils/userProgress.js';
 
 export const addToDictionary = async (req, res) => {
     const { wordId } = req.body;
@@ -23,6 +23,7 @@ export const addToDictionary = async (req, res) => {
     const user = await User.findById(req.user.id);
     user.dictionary.push(userWord._id);
     addScanPoints(user, 1);
+    applyDailyStreakOnScan(user);
     user.achievements = checkAchievements(user.dictionary.length);
 
     await user.save();

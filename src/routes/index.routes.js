@@ -8,6 +8,8 @@ import coursesRoutes from './courses.routes.js';
 import adminLearningRoutes from './admin.learning.routes.js';
 import adminUsersRoutes from './admin.users.routes.js';
 import usersRoutes from './users.routes.js';
+import friendsRoutes from './friends.routes.js';
+import chatsRoutes from './chats.routes.js';
 import { Router } from 'express';
 
 const router = Router();
@@ -22,5 +24,7 @@ router.use('/admin', adminUsersRoutes);
 router.use('/admin/learning', adminLearningRoutes);
 router.use('/courses', coursesRoutes);
 router.use('/users', usersRoutes);
+router.use('/friends', friendsRoutes);
+router.use('/chats', chatsRoutes);
 
 export default router;

@@ -15,7 +15,7 @@ import {
     validateUsername
 } from '../utils/authValidation.js';
 import { sendPasswordResetEmail, sendVerificationCodeEmail } from '../services/mailer.js';
-import { ensureLegacyPoints } from '../utils/userProgress.js';
+import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.js';
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
@@ -564,6 +564,7 @@ export const profile = async (req, res) => {
     }
 
     ensureLegacyPoints(user);
+    normalizeUserStreak(user);
     await user.save();
 
     const analytics = await getUserCourseAnalytics(req.user.id);

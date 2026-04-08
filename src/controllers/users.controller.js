@@ -1,6 +1,9 @@
 import User from '../models/User.js';
 import UserWord from '../models/UserWord.js';
-import { ensureLegacyPoints } from '../utils/userProgress.js';
+import Friendship from '../models/Friendship.js';
+import FriendRequest from '../models/FriendRequest.js';
+import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.js';
+import { normalizeUserPair } from '../utils/socialGraph.js';
 
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -14,13 +17,14 @@ export const getPublicProfileByUsername = async (req, res) => {
         const user = await User.findOne({
             username: { $regex: `^${escapeRegex(username)}$`, $options: 'i' },
             role: { $ne: 'admin' }
-        }).select('avatarUrl username firstName lastName streak totalPoints achievements rank dictionary');
+        }).select('avatarUrl username firstName lastName streak lastStreakDate totalPoints achievements rank dictionary');
 
         if (!user) {
             return res.status(404).json({ message: 'Пользователь не найден' });
         }
 
         ensureLegacyPoints(user);
+        normalizeUserStreak(user);
         await user.save();
 
         const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -29,8 +33,46 @@ export const getPublicProfileByUsername = async (req, res) => {
             UserWord.countDocuments({ user: user._id, learnedAt: { $gte: weekAgo } })
         ]);
 
+        const currentUserId = String(req.user.id);
+        const targetUserId = String(user._id);
+        let relationStatus = 'none';
+        let requestId = null;
+
+        if (currentUserId === targetUserId) {
+            relationStatus = 'self';
+        } else {
+            const pair = normalizeUserPair(currentUserId, targetUserId);
+            const isFriend = await Friendship.exists({ userA: pair.a, userB: pair.b });
+
+            if (isFriend) {
+                relationStatus = 'friend';
+            } else {
+                const [outgoing, incoming] = await Promise.all([
+                    FriendRequest.findOne({
+                        fromUserId: currentUserId,
+                        toUserId: targetUserId,
+                        status: 'pending'
+                    }).select('_id').lean(),
+                    FriendRequest.findOne({
+                        fromUserId: targetUserId,
+                        toUserId: currentUserId,
+                        status: 'pending'
+                    }).select('_id').lean()
+                ]);
+
+                if (outgoing?._id) {
+                    relationStatus = 'pending_outgoing';
+                    requestId = String(outgoing._id);
+                } else if (incoming?._id) {
+                    relationStatus = 'pending_incoming';
+                    requestId = String(incoming._id);
+                }
+            }
+        }
+
         return res.json({
             profile: {
+                _id: user._id,
                 avatarUrl: user.avatarUrl || null,
                 username: user.username,
                 firstName: user.firstName,
@@ -40,7 +82,9 @@ export const getPublicProfileByUsername = async (req, res) => {
                 wordsTotal,
                 totalPoints: Number(user.totalPoints) || 0,
                 achievements: Array.isArray(user.achievements) ? user.achievements : [],
-                rank: user.rank || 'Бронза I'
+                rank: user.rank || 'Бронза I',
+                relationStatus,
+                requestId
             }
         });
     } catch (err) {
