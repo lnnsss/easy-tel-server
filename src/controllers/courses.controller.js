@@ -11,6 +11,19 @@ import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 const TOPIC_POINTS = 3;
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
+const getCourseCategoryIds = (course) => {
+    const fromArray = Array.isArray(course?.categoryIds) ? course.categoryIds : [];
+    const normalizedArray = fromArray
+        .map((entry) => String(entry?._id || entry || '').trim())
+        .filter(Boolean);
+
+    if (normalizedArray.length > 0) {
+        return normalizedArray;
+    }
+
+    const fallback = String(course?.categoryId?._id || course?.categoryId || '').trim();
+    return fallback ? [fallback] : [];
+};
 
 const getOrCreateProgress = async (userId, courseId, topicIds = []) => {
     let progress = await UserCourseProgress.findOne({ userId, courseId });
@@ -94,7 +107,7 @@ export const getCourses = async (req, res) => {
 
         const coursesByCategory = categories.map((category) => {
             const categoryCourses = courses
-                .filter((course) => String(course.categoryId?._id || course.categoryId) === String(category._id))
+                .filter((course) => getCourseCategoryIds(course).includes(String(category._id)))
                 .map((course) => {
                     const progress = progressMap.get(String(course._id));
                     const completedTopics = progress?.completedTopicIds?.length || 0;
@@ -131,7 +144,9 @@ export const getCourseById = async (req, res) => {
             _id: req.params.id,
             status: 'published',
             isActive: true
-        }).populate('categoryId');
+        })
+            .populate('categoryId')
+            .populate('categoryIds');
 
         if (!course) return res.status(404).json({ message: 'Курс не найден' });
 

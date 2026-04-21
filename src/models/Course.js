@@ -4,6 +4,7 @@ const CourseSchema = new mongoose.Schema({
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'CourseCategory', required: true },
+    categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'CourseCategory' }],
     status: { type: String, enum: ['draft', 'published'], default: 'draft' },
     order: { type: Number, default: 0 },
     cover: { type: String, default: '' },
@@ -18,5 +19,6 @@ const CourseSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 CourseSchema.index({ categoryId: 1, order: 1, createdAt: 1 });
+CourseSchema.index({ categoryIds: 1, order: 1, createdAt: 1 });
 
 export default mongoose.model('Course', CourseSchema);

@@ -1,10 +1,9 @@
 import fetch from 'node-fetch';
 import https from 'https';
+import { getTatsoftTimeoutMs, translateWithTatsoft } from '../services/tatsoft.service.js';
 
 const ALLOWED_DIRECTIONS = new Set(['rus2tat', 'tat2rus']);
 const ALLOWED_SPEAKERS = new Set(['almaz', 'alsu']);
-const DEFAULT_BASE = 'https://v2.api.translate.tatar';
-const DEFAULT_TIMEOUT_MS = 60000;
 const DEFAULT_TTS_BASE = 'https://tat-tts.api.translate.tatar';
 const DEFAULT_TTS_TIMEOUT_MS = 60000;
 const DEFAULT_TTS_TOKEN = '4b6e6a31-3cc4-45c9-abf3-a68f0ff73df9';
@@ -13,30 +12,6 @@ const insecureHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 const isTlsCertificateError = (err) => {
     const text = String(err?.message || '').toLowerCase();
     return text.includes('certificate') || text.includes('ssl') || text.includes('tls');
-};
-
-const extractTranslation = (payload) => {
-    if (typeof payload === 'string') {
-        return payload;
-    }
-
-    if (typeof payload?.translation === 'string') {
-        return payload.translation;
-    }
-
-    if (typeof payload?.output === 'string') {
-        return payload.output;
-    }
-
-    if (Array.isArray(payload?.data) && typeof payload.data[0] === 'string') {
-        return payload.data[0];
-    }
-
-    if (Array.isArray(payload?.output?.data) && typeof payload.output.data[0] === 'string') {
-        return payload.output.data[0];
-    }
-
-    return null;
 };
 
 const fetchJsonWithOptionalInsecure = async ({ url, options, allowInsecureTls }) => {
@@ -52,65 +27,6 @@ const fetchJsonWithOptionalInsecure = async ({ url, options, allowInsecureTls })
             agent: insecureHttpsAgent
         });
     }
-};
-
-const callTatsoft = async ({ endpoint, direction, text, timeoutMs }) => {
-    const base = String(process.env.TATSOFT_API_BASE || DEFAULT_BASE).replace(/\/+$/, '');
-    const urls = [`${base}${endpoint}`, `${base}${endpoint}/`];
-    const bodies = [
-        { direction, text },
-        { data: [direction, text] }
-    ];
-    const allowInsecureTls = String(process.env.TATSOFT_ALLOW_INSECURE_TLS || 'true').toLowerCase() === 'true';
-    let lastError = null;
-
-    for (const url of urls) {
-        for (const body of bodies) {
-            const startedAt = Date.now();
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), timeoutMs);
-            const requestOptions = {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-                signal: controller.signal
-            };
-
-            try {
-                const response = await fetchJsonWithOptionalInsecure({
-                    url,
-                    options: requestOptions,
-                    allowInsecureTls
-                });
-
-                if (!response.ok) {
-                    throw new Error(`TatSoft HTTP ${response.status}`);
-                }
-
-                const payload = await response.json();
-                const translated = extractTranslation(payload);
-
-                if (!translated) {
-                    throw new Error('TatSoft malformed response');
-                }
-
-                return {
-                    translation: translated,
-                    durationMs: Date.now() - startedAt
-                };
-            } catch (err) {
-                lastError = err;
-            } finally {
-                clearTimeout(timer);
-            }
-        }
-    }
-
-    if (lastError) {
-        throw lastError;
-    }
-
-    throw new Error('TatSoft unknown error');
 };
 
 const callTatsoftTts = async ({ text, speaker, timeoutMs }) => {
@@ -163,7 +79,7 @@ export const translateText = async (req, res) => {
     try {
         const direction = String(req.body?.direction || '').trim();
         const text = String(req.body?.text || '').trim();
-        const timeoutMs = Math.max(parseInt(process.env.TATSOFT_TIMEOUT_MS, 10) || DEFAULT_TIMEOUT_MS, 1000);
+        const timeoutMs = getTatsoftTimeoutMs();
 
         if (!ALLOWED_DIRECTIONS.has(direction)) {
             return res.status(400).json({ message: 'Некорректное направление перевода' });
@@ -177,43 +93,15 @@ export const translateText = async (req, res) => {
             return res.status(400).json({ message: 'Текст слишком длинный (макс. 5000 символов)' });
         }
 
-        try {
-            const primary = await callTatsoft({
-                endpoint: '/gradio_api/run/gradio_interface_fn',
-                direction,
-                text,
-                timeoutMs
-            });
+        const translationResult = await translateWithTatsoft({ direction, text, timeoutMs });
 
-            return res.json({
-                translation: primary.translation,
-                meta: {
-                    endpointUsed: 'fn',
-                    durationMs: primary.durationMs
-                }
-            });
-        } catch {
-            try {
-                const fallback = await callTatsoft({
-                    endpoint: '/gradio_api/run/gradio_interface_fn_1',
-                    direction,
-                    text,
-                    timeoutMs
-                });
-
-                return res.json({
-                    translation: fallback.translation,
-                    meta: {
-                        endpointUsed: 'fn_1',
-                        durationMs: fallback.durationMs
-                    }
-                });
-            } catch {
-                const upstreamError = new Error('TatSoft upstream failure');
-                upstreamError.code = 'UPSTREAM_FAIL';
-                throw upstreamError;
+        return res.json({
+            translation: translationResult.translation,
+            meta: {
+                endpointUsed: translationResult.endpointUsed,
+                durationMs: translationResult.durationMs
             }
-        }
+        });
     } catch (err) {
         const message = String(err?.message || '');
         if (message.includes('TatSoft') || message.includes('aborted') || err?.name === 'AbortError') {

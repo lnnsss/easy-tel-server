@@ -22,6 +22,31 @@ const normalizePinnedMode = (value) => {
     return 'persistent';
 };
 
+const normalizeCategoryIds = (rawCategoryIds, rawCategoryId) => {
+    const source = [];
+
+    if (Array.isArray(rawCategoryIds)) {
+        source.push(...rawCategoryIds);
+    } else if (typeof rawCategoryIds === 'string' && rawCategoryIds.trim()) {
+        source.push(...rawCategoryIds.split(','));
+    }
+
+    if (source.length === 0 && rawCategoryId) {
+        source.push(rawCategoryId);
+    }
+
+    const unique = [];
+    for (const item of source) {
+        const value = String(item || '').trim();
+        if (!value || unique.includes(value)) {
+            continue;
+        }
+        unique.push(value);
+    }
+
+    return unique;
+};
+
 const validateAndNormalizeQuestions = (questions = []) => {
     if (!Array.isArray(questions) || questions.length === 0) {
         throw new Error('Добавьте хотя бы один вопрос');
@@ -134,7 +159,12 @@ export const updateCategory = async (req, res) => {
 
 export const deleteCategory = async (req, res) => {
     try {
-        const coursesCount = await Course.countDocuments({ categoryId: req.params.id });
+        const coursesCount = await Course.countDocuments({
+            $or: [
+                { categoryId: req.params.id },
+                { categoryIds: req.params.id }
+            ]
+        });
         if (coursesCount > 0) {
             return res.status(400).json({ message: 'Нельзя удалить категорию с курсами' });
         }
@@ -153,6 +183,7 @@ export const createCourse = async (req, res) => {
             title,
             description = '',
             categoryId,
+            categoryIds,
             status = 'draft',
             order = 0,
             cover = '',
@@ -166,14 +197,16 @@ export const createCourse = async (req, res) => {
             return res.status(400).json({ message: 'Название курса обязательно' });
         }
 
-        if (!categoryId) {
-            return res.status(400).json({ message: 'categoryId обязателен' });
+        const normalizedCategoryIds = normalizeCategoryIds(categoryIds, categoryId);
+        if (normalizedCategoryIds.length === 0) {
+            return res.status(400).json({ message: 'Выберите хотя бы одну категорию' });
         }
 
         const course = await Course.create({
             title: String(title).trim(),
             description: String(description || ''),
-            categoryId,
+            categoryId: normalizedCategoryIds[0],
+            categoryIds: normalizedCategoryIds,
             status: status === 'published' ? 'published' : 'draft',
             order: Number(order) || 0,
             cover: String(cover || ''),
@@ -201,6 +234,7 @@ export const getCoursesAdmin = async (_req, res) => {
     try {
         const courses = await Course.find()
             .populate('categoryId')
+            .populate('categoryIds')
             .sort({ order: 1, createdAt: 1 });
 
         return res.json(courses);
@@ -223,13 +257,23 @@ export const updateCourse = async (req, res) => {
         if (payload.isPinnedHome !== undefined) payload.isPinnedHome = parseBoolean(payload.isPinnedHome, false);
         if (payload.pinnedHomeText !== undefined) payload.pinnedHomeText = String(payload.pinnedHomeText || '').trim();
         if (payload.pinnedHomeMode !== undefined) payload.pinnedHomeMode = normalizePinnedMode(payload.pinnedHomeMode);
+        if (payload.categoryIds !== undefined || payload.categoryId !== undefined) {
+            const normalizedCategoryIds = normalizeCategoryIds(payload.categoryIds, payload.categoryId);
+            if (normalizedCategoryIds.length === 0) {
+                return res.status(400).json({ message: 'Выберите хотя бы одну категорию' });
+            }
+            payload.categoryIds = normalizedCategoryIds;
+            payload.categoryId = normalizedCategoryIds[0];
+        }
 
         if (payload.isPinnedHome === false) {
             payload.pinnedHomeText = '';
             payload.pinnedHomeMode = 'persistent';
         }
 
-        const course = await Course.findByIdAndUpdate(req.params.id, payload, { new: true }).populate('categoryId');
+        const course = await Course.findByIdAndUpdate(req.params.id, payload, { new: true })
+            .populate('categoryId')
+            .populate('categoryIds');
         if (!course) return res.status(404).json({ message: 'Курс не найден' });
 
         if (course.isPinnedHome) {

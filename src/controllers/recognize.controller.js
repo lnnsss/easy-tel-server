@@ -2,10 +2,49 @@ import Word from "../models/Word.js";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
 import FormData from "form-data";
+import mongoose from "mongoose";
+import { generateUsageExamplesForWord, normalizeUsageExamples } from "../services/usageExamples.service.js";
 
 dotenv.config();
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
+
+export const generateUsageExamples = async (req, res) => {
+    try {
+        const wordId = String(req.body?.wordId || "").trim();
+        const excludeExamplesRaw = Array.isArray(req.body?.excludeExamples) ? req.body.excludeExamples : [];
+        if (!wordId) {
+            return res.status(400).json({ message: "wordId обязателен" });
+        }
+        if (!mongoose.Types.ObjectId.isValid(wordId)) {
+            return res.status(400).json({ message: "Некорректный wordId" });
+        }
+
+        const foundWord = await Word.findOne({ _id: wordId, isActive: true })
+            .select("nameRu nameTatar usageExamples");
+
+        if (!foundWord) {
+            return res.status(404).json({ message: "Слово не найдено" });
+        }
+
+        const usageExamples = await generateUsageExamplesForWord({
+            wordRu: foundWord.nameRu,
+            wordTatar: foundWord.nameTatar,
+            excludeExamples: excludeExamplesRaw
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                wordId: foundWord._id,
+                usageExamples
+            }
+        });
+    } catch (err) {
+        console.error("🔥 Ошибка в generateUsageExamples:", err);
+        return res.status(500).json({ message: "Ошибка сервера", error: err.message });
+    }
+};
 
 export const recognizeImage = async (req, res) => {
     console.log("=== START recognizeImage ===");
@@ -96,6 +135,7 @@ export const recognizeImage = async (req, res) => {
         }
 
         console.log("✅ Найдено слово в БД:", foundWord.nameEn, "score:", bestScore);
+        const usageExamples = normalizeUsageExamples(foundWord.usageExamples);
 
         return res.status(200).json({
             success: true,
@@ -106,6 +146,7 @@ export const recognizeImage = async (req, res) => {
                 nameTatar: foundWord.nameTatar,
                 transcription: foundWord.transcription,
                 description: foundWord.descriptionRu,
+                usageExamples,
                 score: bestScore
             }
         });
