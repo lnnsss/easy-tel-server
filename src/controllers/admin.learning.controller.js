@@ -4,6 +4,13 @@ import CourseTopic from '../models/CourseTopic.js';
 import TopicQuiz from '../models/TopicQuiz.js';
 import UserCourseProgress from '../models/UserCourseProgress.js';
 import UserTopicAttempt from '../models/UserTopicAttempt.js';
+import User from '../models/User.js';
+import { sendCourseReviewDecisionEmail } from '../services/mailer.js';
+import {
+    buildContentBlocksForRead,
+    buildLegacyContentFromBlocks,
+    normalizeTopicBlocks
+} from '../utils/topicContent.js';
 
 const parseBoolean = (value, fallback = true) => {
     if (typeof value === 'boolean') return value;
@@ -45,6 +52,26 @@ const normalizeCategoryIds = (rawCategoryIds, rawCategoryId) => {
     }
 
     return unique;
+};
+
+const cloneQuizPayload = (quizDoc, topicId) => ({
+    topicId,
+    passingScore: quizDoc.passingScore,
+    questions: Array.isArray(quizDoc.questions) ? quizDoc.questions : []
+});
+
+const buildTopicReadPayload = (topicDoc) => {
+    const topic = topicDoc?.toObject ? topicDoc.toObject() : topicDoc;
+    return {
+        ...topic,
+        contentBlocks: buildContentBlocksForRead(topic)
+    };
+};
+
+const isTopicContentValidationError = (message = '') => {
+    return message.includes('contentBlocks')
+        || message.includes('Добавьте хотя бы один блок контента')
+        || message.includes('Блок #');
 };
 
 const validateAndNormalizeQuestions = (questions = []) => {
@@ -207,7 +234,14 @@ export const createCourse = async (req, res) => {
             description: String(description || ''),
             categoryId: normalizedCategoryIds[0],
             categoryIds: normalizedCategoryIds,
+            ownerUserId: req.user.id,
             status: status === 'published' ? 'published' : 'draft',
+            reviewStatus: 'not_required',
+            reviewComment: '',
+            reviewedBy: null,
+            reviewedAt: null,
+            isRevision: false,
+            sourceCourseId: null,
             order: Number(order) || 0,
             cover: String(cover || ''),
             isActive: parseBoolean(isActive, true),
@@ -232,9 +266,15 @@ export const createCourse = async (req, res) => {
 
 export const getCoursesAdmin = async (_req, res) => {
     try {
-        const courses = await Course.find()
+        const courses = await Course.find({
+            $or: [
+                { reviewStatus: { $in: ['not_required', 'approved', 'pending_review'] } },
+                { ownerUserId: null }
+            ]
+        })
             .populate('categoryId')
             .populate('categoryIds')
+            .populate('ownerUserId', 'username firstName lastName role email')
             .sort({ order: 1, createdAt: 1 });
 
         return res.json(courses);
@@ -242,6 +282,91 @@ export const getCoursesAdmin = async (_req, res) => {
         console.error('getCoursesAdmin error', err);
         return res.status(500).json({ message: 'Ошибка загрузки курсов' });
     }
+};
+
+const applyRevisionToSourceCourse = async (revisionCourse, adminId, adminComment = '') => {
+    const sourceCourse = await Course.findById(revisionCourse.sourceCourseId);
+    if (!sourceCourse) {
+        throw new Error('Исходный курс ревизии не найден');
+    }
+
+    sourceCourse.title = revisionCourse.title;
+    sourceCourse.description = revisionCourse.description;
+    sourceCourse.categoryId = revisionCourse.categoryId;
+    sourceCourse.categoryIds = revisionCourse.categoryIds || [];
+    sourceCourse.order = Number(revisionCourse.order) || 0;
+    sourceCourse.cover = String(revisionCourse.cover || '');
+    sourceCourse.isActive = parseBoolean(revisionCourse.isActive, true);
+    sourceCourse.status = 'published';
+    sourceCourse.reviewStatus = 'approved';
+    sourceCourse.reviewComment = String(adminComment || '').trim();
+    sourceCourse.reviewedBy = adminId;
+    sourceCourse.reviewedAt = new Date();
+    await sourceCourse.save();
+
+    const [sourceTopics, revisionTopics] = await Promise.all([
+        CourseTopic.find({ courseId: sourceCourse._id }),
+        CourseTopic.find({ courseId: revisionCourse._id }).sort({ order: 1, createdAt: 1 })
+    ]);
+
+    const sourceTopicMap = new Map(sourceTopics.map((item) => [String(item._id), item]));
+    const touchedSourceTopicIds = new Set();
+    const revisionToTargetTopicId = new Map();
+
+    for (const revisionTopic of revisionTopics) {
+        const revisionBlocks = buildContentBlocksForRead(revisionTopic);
+        const sourceTopicId = String(revisionTopic.sourceTopicId || '');
+        const existingSourceTopic = sourceTopicId ? sourceTopicMap.get(sourceTopicId) : null;
+        if (existingSourceTopic) {
+            existingSourceTopic.title = revisionTopic.title;
+            existingSourceTopic.content = buildLegacyContentFromBlocks(revisionBlocks);
+            existingSourceTopic.contentBlocks = revisionBlocks;
+            existingSourceTopic.order = Number(revisionTopic.order) || 0;
+            existingSourceTopic.status = revisionTopic.status === 'published' ? 'published' : 'draft';
+            await existingSourceTopic.save();
+            touchedSourceTopicIds.add(String(existingSourceTopic._id));
+            revisionToTargetTopicId.set(String(revisionTopic._id), existingSourceTopic._id);
+            continue;
+        }
+
+        const createdSourceTopic = await CourseTopic.create({
+            courseId: sourceCourse._id,
+            sourceTopicId: null,
+            title: revisionTopic.title,
+            content: buildLegacyContentFromBlocks(revisionBlocks),
+            contentBlocks: revisionBlocks,
+            order: Number(revisionTopic.order) || 0,
+            status: revisionTopic.status === 'published' ? 'published' : 'draft'
+        });
+
+        touchedSourceTopicIds.add(String(createdSourceTopic._id));
+        revisionToTargetTopicId.set(String(revisionTopic._id), createdSourceTopic._id);
+    }
+
+    for (const sourceTopic of sourceTopics) {
+        if (!touchedSourceTopicIds.has(String(sourceTopic._id))) {
+            sourceTopic.status = 'draft';
+            await sourceTopic.save();
+        }
+    }
+
+    const revisionTopicIds = revisionTopics.map((topic) => topic._id);
+    const revisionQuizzes = await TopicQuiz.find({ topicId: { $in: revisionTopicIds } });
+    for (const revisionQuiz of revisionQuizzes) {
+        const targetTopicId = revisionToTargetTopicId.get(String(revisionQuiz.topicId));
+        if (!targetTopicId) continue;
+        await TopicQuiz.findOneAndUpdate(
+            { topicId: targetTopicId },
+            cloneQuizPayload(revisionQuiz, targetTopicId),
+            { upsert: true, new: true }
+        );
+    }
+
+    await TopicQuiz.deleteMany({ topicId: { $in: revisionTopicIds } });
+    await CourseTopic.deleteMany({ courseId: revisionCourse._id });
+    await Course.deleteOne({ _id: revisionCourse._id });
+
+    return sourceCourse;
 };
 
 export const updateCourse = async (req, res) => {
@@ -310,11 +435,19 @@ export const deleteCourse = async (req, res) => {
 
 export const createTopic = async (req, res) => {
     try {
-        const { courseId, title, content, order = 0, status = 'draft' } = req.body;
+        const { courseId, title, content, contentBlocks, order = 0, status = 'draft' } = req.body;
 
         if (!courseId) return res.status(400).json({ message: 'courseId обязателен' });
         if (!String(title || '').trim()) return res.status(400).json({ message: 'Название темы обязательно' });
-        if (!String(content || '').trim()) return res.status(400).json({ message: 'Контент темы обязателен' });
+
+        let normalizedContentBlocks = [];
+        if (contentBlocks !== undefined) {
+            normalizedContentBlocks = normalizeTopicBlocks(contentBlocks);
+        } else if (String(content || '').trim()) {
+            normalizedContentBlocks = [{ type: 'text', text: String(content), url: '' }];
+        } else {
+            return res.status(400).json({ message: 'Контент темы обязателен' });
+        }
 
         const hasExplicitOrder = req.body.order !== undefined && req.body.order !== null && String(req.body.order).trim() !== '';
         let finalOrder = Number(order) || 0;
@@ -326,16 +459,19 @@ export const createTopic = async (req, res) => {
 
         const topic = await CourseTopic.create({
             courseId,
+            sourceTopicId: null,
             title: String(title).trim(),
-            content: String(content),
+            content: buildLegacyContentFromBlocks(normalizedContentBlocks),
+            contentBlocks: normalizedContentBlocks,
             order: finalOrder,
             status: status === 'published' ? 'published' : 'draft'
         });
 
-        return res.status(201).json(topic);
+        return res.status(201).json(buildTopicReadPayload(topic));
     } catch (err) {
         console.error('createTopic error', err);
-        return res.status(500).json({ message: 'Ошибка создания темы' });
+        const status = isTopicContentValidationError(err?.message) ? 400 : 500;
+        return res.status(status).json({ message: err?.message || 'Ошибка создания темы' });
     }
 };
 
@@ -343,7 +479,7 @@ export const getTopicsAdmin = async (req, res) => {
     try {
         const query = req.query.courseId ? { courseId: req.query.courseId } : {};
         const topics = await CourseTopic.find(query).sort({ order: 1, createdAt: 1 });
-        return res.json(topics);
+        return res.json(topics.map(buildTopicReadPayload));
     } catch (err) {
         console.error('getTopicsAdmin error', err);
         return res.status(500).json({ message: 'Ошибка загрузки тем' });
@@ -354,17 +490,38 @@ export const updateTopic = async (req, res) => {
     try {
         const payload = { ...req.body };
         if (payload.title !== undefined) payload.title = String(payload.title || '').trim();
-        if (payload.content !== undefined) payload.content = String(payload.content || '');
         if (payload.order !== undefined) payload.order = Number(payload.order) || 0;
         if (payload.status !== undefined) payload.status = payload.status === 'published' ? 'published' : 'draft';
 
+        if (payload.contentBlocks !== undefined) {
+            payload.contentBlocks = normalizeTopicBlocks(payload.contentBlocks);
+            payload.content = buildLegacyContentFromBlocks(payload.contentBlocks);
+        } else if (payload.content !== undefined) {
+            const normalizedLegacy = String(payload.content || '');
+            payload.content = normalizedLegacy;
+            payload.contentBlocks = normalizedLegacy.trim()
+                ? [{ type: 'text', text: normalizedLegacy, url: '' }]
+                : [];
+        }
+
         const topic = await CourseTopic.findByIdAndUpdate(req.params.id, payload, { new: true });
         if (!topic) return res.status(404).json({ message: 'Тема не найдена' });
-        return res.json(topic);
+        return res.json(buildTopicReadPayload(topic));
     } catch (err) {
         console.error('updateTopic error', err);
-        return res.status(500).json({ message: 'Ошибка обновления темы' });
+        const status = isTopicContentValidationError(err?.message) ? 400 : 500;
+        return res.status(status).json({ message: err?.message || 'Ошибка обновления темы' });
     }
+};
+
+export const uploadTopicImage = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'Файл изображения обязателен' });
+    }
+
+    return res.json({
+        url: `/uploads/${req.file.filename}`
+    });
 };
 
 export const deleteTopic = async (req, res) => {
@@ -426,5 +583,77 @@ export const getTopicQuizAdmin = async (req, res) => {
     } catch (err) {
         console.error('getTopicQuizAdmin error', err);
         return res.status(500).json({ message: 'Ошибка загрузки теста' });
+    }
+};
+
+export const reviewCourse = async (req, res) => {
+    try {
+        const decision = String(req.body.decision || '').trim();
+        const adminComment = String(req.body.adminComment || '').trim();
+        if (decision !== 'approved' && decision !== 'rejected') {
+            return res.status(400).json({ message: 'Решение должно быть approved или rejected' });
+        }
+
+        const course = await Course.findById(req.params.id);
+        if (!course) return res.status(404).json({ message: 'Курс не найден' });
+        if (course.reviewStatus !== 'pending_review') {
+            return res.status(400).json({ message: 'Курс не находится на модерации' });
+        }
+
+        if (decision === 'approved') {
+            course.status = 'draft';
+            course.reviewStatus = 'approved';
+            course.reviewComment = adminComment;
+            course.reviewedBy = req.user.id;
+            course.reviewedAt = new Date();
+            await course.save();
+
+            if (course.ownerUserId) {
+                const owner = await User.findById(course.ownerUserId).select('email firstName');
+                if (owner?.email) {
+                    try {
+                        await sendCourseReviewDecisionEmail({
+                            to: owner.email,
+                            firstName: owner.firstName,
+                            decision: 'approved',
+                            courseTitle: course.title,
+                            adminComment
+                        });
+                    } catch (mailErr) {
+                        console.error('sendCourseReviewDecisionEmail approved error', mailErr);
+                    }
+                }
+            }
+            return res.json({ message: 'Курс одобрен и переведен в черновик' });
+        }
+
+        course.status = 'draft';
+        course.reviewStatus = 'rejected';
+        course.reviewComment = adminComment;
+        course.reviewedBy = req.user.id;
+        course.reviewedAt = new Date();
+        await course.save();
+
+        if (course.ownerUserId) {
+            const owner = await User.findById(course.ownerUserId).select('email firstName');
+            if (owner?.email) {
+                try {
+                    await sendCourseReviewDecisionEmail({
+                        to: owner.email,
+                        firstName: owner.firstName,
+                        decision: 'rejected',
+                        courseTitle: course.title,
+                        adminComment
+                    });
+                } catch (mailErr) {
+                    console.error('sendCourseReviewDecisionEmail rejected error', mailErr);
+                }
+            }
+        }
+
+        return res.json({ message: 'Курс отклонен' });
+    } catch (err) {
+        console.error('reviewCourse error', err);
+        return res.status(500).json({ message: err?.message || 'Ошибка модерации курса' });
     }
 };

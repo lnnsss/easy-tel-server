@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import User from '../models/User.js';
+import AuthorRoleRequest from '../models/AuthorRoleRequest.js';
 import {
     normalizeEmail,
     normalizeName,
@@ -568,9 +569,19 @@ export const profile = async (req, res) => {
     await user.save();
 
     const analytics = await getUserCourseAnalytics(req.user.id);
+    const latestAuthorRequest = await AuthorRoleRequest.findOne({ userId: req.user.id })
+        .sort({ createdAt: -1 })
+        .lean();
+    const authorRequestNotice = (
+        latestAuthorRequest
+        && latestAuthorRequest.status !== 'pending'
+        && !latestAuthorRequest.decisionSeenAt
+    ) ? latestAuthorRequest : null;
 
     res.json({
         ...user.toObject(),
-        analytics
+        analytics,
+        latestAuthorRequest: latestAuthorRequest || null,
+        authorRequestNotice
     });
 };

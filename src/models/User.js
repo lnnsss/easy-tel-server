@@ -16,7 +16,7 @@ const UserSchema = new mongoose.Schema({
     passwordResetExpiresAt: { type: Date, default: null },
     tokenVersion: { type: Number, default: 0 },
 
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    role: { type: String, enum: ['user', 'author', 'admin'], default: 'user' },
 
     dictionary: [{
         type: mongoose.Schema.Types.ObjectId,

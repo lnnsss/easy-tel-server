@@ -7,6 +7,7 @@ import UserTopicAttempt from '../models/UserTopicAttempt.js';
 import User from '../models/User.js';
 import { addStudyPoints, ensureLegacyPoints } from '../utils/userProgress.js';
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
+import { buildContentBlocksForRead } from '../utils/topicContent.js';
 
 const TOPIC_POINTS = 3;
 
@@ -91,7 +92,12 @@ export const getCourses = async (req, res) => {
     try {
         const [categories, courses, progresses, topicCounts] = await Promise.all([
             CourseCategory.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).lean(),
-            Course.find({ status: 'published', isActive: true })
+            Course.find({
+                status: 'published',
+                isActive: true,
+                isRevision: { $ne: true },
+                reviewStatus: { $in: ['not_required', 'approved', null] }
+            })
                 .populate('categoryId')
                 .sort({ order: 1, createdAt: 1 })
                 .lean(),
@@ -143,7 +149,9 @@ export const getCourseById = async (req, res) => {
         const course = await Course.findOne({
             _id: req.params.id,
             status: 'published',
-            isActive: true
+            isActive: true,
+            isRevision: { $ne: true },
+            reviewStatus: { $in: ['not_required', 'approved', null] }
         })
             .populate('categoryId')
             .populate('categoryIds');
@@ -186,7 +194,9 @@ export const getPinnedCourse = async (_req, res) => {
         const course = await Course.findOne({
             isPinnedHome: true,
             status: 'published',
-            isActive: true
+            isActive: true,
+            isRevision: { $ne: true },
+            reviewStatus: { $in: ['not_required', 'approved', null] }
         }).select('_id title pinnedHomeText pinnedHomeMode');
 
         if (!course) return res.json({ course: null });
@@ -211,7 +221,9 @@ export const getCourseTopicById = async (req, res) => {
         const course = await Course.findOne({
             _id: courseId,
             status: 'published',
-            isActive: true
+            isActive: true,
+            isRevision: { $ne: true },
+            reviewStatus: { $in: ['not_required', 'approved', null] }
         });
 
         if (!course) return res.status(404).json({ message: 'Курс не найден' });
@@ -230,7 +242,10 @@ export const getCourseTopicById = async (req, res) => {
         const quiz = await TopicQuiz.findOne({ topicId: topic._id });
 
         return res.json({
-            topic,
+            topic: {
+                ...topic.toObject(),
+                contentBlocks: buildContentBlocksForRead(topic)
+            },
             quiz: quiz ? {
                 _id: quiz._id,
                 passingScore: quiz.passingScore,
@@ -252,7 +267,13 @@ export const submitTopicQuiz = async (req, res) => {
             return res.status(400).json({ message: 'Неверный формат ответов' });
         }
 
-        const course = await Course.findOne({ _id: courseId, status: 'published', isActive: true });
+        const course = await Course.findOne({
+            _id: courseId,
+            status: 'published',
+            isActive: true,
+            isRevision: { $ne: true },
+            reviewStatus: { $in: ['not_required', 'approved', null] }
+        });
         if (!course) return res.status(404).json({ message: 'Курс не найден' });
 
         const topics = await getTopicList(course._id);
