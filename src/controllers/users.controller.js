@@ -4,6 +4,7 @@ import Friendship from '../models/Friendship.js';
 import FriendRequest from '../models/FriendRequest.js';
 import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.js';
 import { normalizeUserPair } from '../utils/socialGraph.js';
+import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -17,7 +18,7 @@ export const getPublicProfileByUsername = async (req, res) => {
         const user = await User.findOne({
             username: { $regex: `^${escapeRegex(username)}$`, $options: 'i' },
             role: { $ne: 'admin' }
-        }).select('avatarUrl username firstName lastName streak lastStreakDate totalPoints achievements rank dictionary');
+        }).select('avatarUrl username firstName lastName streak lastStreakDate totalPoints coins achievements rank dictionary characterCustomization ownedCosmetics');
 
         if (!user) {
             return res.status(404).json({ message: 'Пользователь не найден' });
@@ -32,6 +33,7 @@ export const getPublicProfileByUsername = async (req, res) => {
             UserWord.countDocuments({ user: user._id }),
             UserWord.countDocuments({ user: user._id, learnedAt: { $gte: weekAgo } })
         ]);
+        const analytics = await getUserCourseAnalytics(user._id);
 
         const currentUserId = String(req.user.id);
         const targetUserId = String(user._id);
@@ -81,8 +83,12 @@ export const getPublicProfileByUsername = async (req, res) => {
                 wordsWeek,
                 wordsTotal,
                 totalPoints: Number(user.totalPoints) || 0,
+                coins: Number(user.coins) || 0,
                 achievements: Array.isArray(user.achievements) ? user.achievements : [],
                 rank: user.rank || 'Бронза I',
+                characterCustomization: user.characterCustomization || null,
+                ownedCosmetics: user.ownedCosmetics || null,
+                analytics,
                 relationStatus,
                 requestId
             }

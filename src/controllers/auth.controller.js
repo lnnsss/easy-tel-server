@@ -19,6 +19,14 @@ import { sendPasswordResetEmail, sendVerificationCodeEmail } from '../services/m
 import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.js';
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 import { normalizeUserWordsForResponse } from '../services/userWordPresenter.service.js';
+import {
+    CHARACTER_ALLOWED,
+    COSMETIC_ALLOWED,
+    COSMETIC_CATEGORIES,
+    DEFAULT_CHARACTER_CUSTOMIZATION,
+    FREE_ITEMS_WHITELIST,
+    ITEM_PRICE_COINS
+} from '../config/characterAssets.js';
 
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -92,6 +100,14 @@ const buildUniqueUsername = async (baseUsername) => {
     return finalCandidate;
 };
 
+const buildDefaultOwnedCosmetics = () => {
+    const result = {};
+    for (const category of COSMETIC_CATEGORIES) {
+        result[category] = Array.isArray(FREE_ITEMS_WHITELIST[category]) ? [...FREE_ITEMS_WHITELIST[category]] : [];
+    }
+    return result;
+};
+
 export const register = async (req, res) => {
     try {
         const {
@@ -154,7 +170,9 @@ export const register = async (req, res) => {
             username: normalizedUsername,
             firstName: normalizedFirstName,
             lastName: normalizedLastName,
-            role: 'user'
+            role: 'user',
+            coins: 0,
+            ownedCosmetics: buildDefaultOwnedCosmetics()
         });
 
         const token = createJwtToken(user);
@@ -451,7 +469,9 @@ export const googleAuthCallback = async (req, res) => {
                 lastName: derivedLastName,
                 avatarUrl: picture || null,
                 password: passwordHash,
-                role: 'user'
+                role: 'user',
+                coins: 0,
+                ownedCosmetics: buildDefaultOwnedCosmetics()
             });
         } else {
             let requiresSave = false;
@@ -487,38 +507,134 @@ export const googleAuthCallback = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
     try {
-        const { firstName, lastName, username } = req.body;
+        const { firstName, lastName, username, characterCustomization, purchaseItem } = req.body || {};
+        const updates = {};
 
-        const normalizedFirstName = normalizeName(firstName);
-        const normalizedLastName = normalizeName(lastName);
-        const normalizedUsername = String(username || '').trim();
-
-        const firstNameError = validateName(normalizedFirstName);
-        if (firstNameError) return res.status(400).json({ message: firstNameError });
-
-        const lastNameError = validateName(normalizedLastName);
-        if (lastNameError) return res.status(400).json({ message: lastNameError });
-
-        const usernameError = validateUsername(normalizedUsername);
-        if (usernameError) return res.status(400).json({ message: usernameError });
-
-        const exists = await User.findOne({
-            username: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: 'i' },
-            _id: { $ne: req.user.id }
-        });
-        if (exists) {
-            return res.status(400).json({ message: 'Username уже занят' });
+        const currentUser = await User.findById(req.user.id)
+            .select('-password -emailVerificationCodeHash -passwordResetTokenHash');
+        if (!currentUser) {
+            return res.status(404).json({ message: 'Пользователь не найден' });
         }
 
-        const user = await User.findByIdAndUpdate(
-            req.user.id,
-            {
-                firstName: normalizedFirstName,
-                lastName: normalizedLastName,
-                username: normalizedUsername
-            },
-            { new: true }
-        ).select('-password -emailVerificationCodeHash -passwordResetTokenHash');
+        if (!currentUser.ownedCosmetics || typeof currentUser.ownedCosmetics !== 'object') {
+            currentUser.ownedCosmetics = {};
+        }
+        for (const category of COSMETIC_CATEGORIES) {
+            const freeItems = Array.isArray(FREE_ITEMS_WHITELIST[category]) ? FREE_ITEMS_WHITELIST[category] : [];
+            const current = Array.isArray(currentUser.ownedCosmetics[category]) ? currentUser.ownedCosmetics[category] : [];
+            currentUser.ownedCosmetics[category] = [...new Set([...freeItems, ...current])];
+        }
+        if (!Number.isFinite(Number(currentUser.coins)) || Number(currentUser.coins) < 0) {
+            currentUser.coins = Number(currentUser.totalPoints) || 0;
+        }
+
+        if (firstName !== undefined) {
+            const normalizedFirstName = normalizeName(firstName);
+            const firstNameError = validateName(normalizedFirstName);
+            if (firstNameError) return res.status(400).json({ message: firstNameError });
+            updates.firstName = normalizedFirstName;
+        }
+
+        if (lastName !== undefined) {
+            const normalizedLastName = normalizeName(lastName);
+            const lastNameError = validateName(normalizedLastName);
+            if (lastNameError) return res.status(400).json({ message: lastNameError });
+            updates.lastName = normalizedLastName;
+        }
+
+        if (username !== undefined) {
+            const normalizedUsername = String(username || '').trim();
+            const usernameError = validateUsername(normalizedUsername);
+            if (usernameError) return res.status(400).json({ message: usernameError });
+
+            const exists = await User.findOne({
+                username: { $regex: `^${escapeRegex(normalizedUsername)}$`, $options: 'i' },
+                _id: { $ne: req.user.id }
+            });
+            if (exists) {
+                return res.status(400).json({ message: 'Username уже занят' });
+            }
+            updates.username = normalizedUsername;
+        }
+
+        if (purchaseItem !== undefined) {
+            if (!purchaseItem || typeof purchaseItem !== 'object' || Array.isArray(purchaseItem)) {
+                return res.status(400).json({ message: 'purchaseItem должен быть объектом' });
+            }
+
+            const category = String(purchaseItem.category || '').trim();
+            const file = String(purchaseItem.file || '').trim();
+            if (!COSMETIC_CATEGORIES.includes(category)) {
+                return res.status(400).json({ message: 'Недопустимая категория для покупки' });
+            }
+            if (!COSMETIC_ALLOWED[category]?.has(file)) {
+                return res.status(400).json({ message: 'Недопустимый файл для покупки' });
+            }
+
+            const freeItems = new Set(FREE_ITEMS_WHITELIST[category] || []);
+            const owned = new Set(Array.isArray(currentUser.ownedCosmetics[category]) ? currentUser.ownedCosmetics[category] : []);
+            const alreadyOwned = freeItems.has(file) || owned.has(file);
+            if (!alreadyOwned) {
+                const coins = Number(currentUser.coins) || 0;
+                if (coins < ITEM_PRICE_COINS) {
+                    return res.status(400).json({ message: 'Недостаточно монет для покупки' });
+                }
+                currentUser.coins = coins - ITEM_PRICE_COINS;
+                owned.add(file);
+                currentUser.ownedCosmetics[category] = [...owned];
+            }
+        }
+
+        if (characterCustomization !== undefined) {
+            if (!characterCustomization || typeof characterCustomization !== 'object' || Array.isArray(characterCustomization)) {
+                return res.status(400).json({ message: 'characterCustomization должен быть объектом' });
+            }
+
+            const merged = {
+                ...DEFAULT_CHARACTER_CUSTOMIZATION,
+                ...characterCustomization
+            };
+
+            const fields = ['gender', 'characterFile', 'shoesFile', 'bottomFile', 'topFile', 'headdressFile', 'backgroundFile'];
+            for (const field of fields) {
+                const value = String(merged[field] || '').trim();
+                const whitelist = CHARACTER_ALLOWED[field];
+                if (!whitelist || !whitelist.has(value)) {
+                    return res.status(400).json({ message: `Недопустимое значение для ${field}` });
+                }
+                merged[field] = value;
+            }
+
+            const ownershipMap = {
+                shoesFile: 'shoes',
+                bottomFile: 'bottom',
+                topFile: 'top',
+                headdressFile: 'headdress'
+            };
+            for (const [field, category] of Object.entries(ownershipMap)) {
+                const selected = merged[field];
+                const freeItems = new Set(FREE_ITEMS_WHITELIST[category] || []);
+                const owned = new Set(Array.isArray(currentUser.ownedCosmetics[category]) ? currentUser.ownedCosmetics[category] : []);
+                if (!freeItems.has(selected) && !owned.has(selected)) {
+                    return res.status(400).json({ message: `Сначала купите «${selected}»` });
+                }
+            }
+
+            updates.characterCustomization = {
+                ...merged,
+                updatedAt: new Date()
+            };
+        }
+
+        if (Object.keys(updates).length === 0 && purchaseItem === undefined) {
+            return res.status(400).json({ message: 'Нет полей для обновления' });
+        }
+
+        Object.assign(currentUser, updates);
+        await currentUser.save();
+
+        const user = await User.findById(currentUser._id)
+            .select('-password -emailVerificationCodeHash -passwordResetTokenHash');
 
         return res.json({ message: 'Профиль обновлен', user });
     } catch (err) {

@@ -10,6 +10,16 @@ const UserSchema = new mongoose.Schema({
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     avatarUrl: { type: String, default: null },
+    characterCustomization: {
+        gender: { type: String, enum: ['male', 'female'], default: 'male' },
+        characterFile: { type: String, default: 'Алмаз.png' },
+        shoesFile: { type: String, default: 'Базовая.png' },
+        bottomFile: { type: String, default: 'Базовые.png' },
+        topFile: { type: String, default: 'Базовая.png' },
+        headdressFile: { type: String, default: 'Базовый.png' },
+        backgroundFile: { type: String, default: '__theme__' },
+        updatedAt: { type: Date, default: Date.now }
+    },
 
     password: { type: String, required: true },
     passwordResetTokenHash: { type: String, default: null },
@@ -26,6 +36,13 @@ const UserSchema = new mongoose.Schema({
     scanPoints: { type: Number, default: 0 },
     studyPoints: { type: Number, default: 0 },
     totalPoints: { type: Number, default: 0 },
+    coins: { type: Number, default: 0 },
+    ownedCosmetics: {
+        shoes: { type: [String], default: [] },
+        bottom: { type: [String], default: [] },
+        top: { type: [String], default: [] },
+        headdress: { type: [String], default: [] }
+    },
 
     rank: { type: String, default: 'Бронза I' },
     achievements: { type: [String], default: [] },
