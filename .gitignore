@@ -10,6 +10,7 @@ yarn-error.log*
 # Logs
 logs/
 *.log
+.cache/
 
 # OS
 .DS_Store

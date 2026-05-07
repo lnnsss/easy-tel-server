@@ -73,6 +73,7 @@ const isTopicContentValidationError = (message = '') => {
         || message.includes('Добавьте хотя бы один блок контента')
         || message.includes('Блок #');
 };
+const SENTENCE_ALLOWED_RE = /^[\p{L}\p{N}\s-]+$/u;
 
 const validateAndNormalizeQuestions = (questions = []) => {
     if (!Array.isArray(questions) || questions.length === 0) {
@@ -88,7 +89,7 @@ const validateAndNormalizeQuestions = (questions = []) => {
             throw new Error(`Вопрос #${index + 1}: заполните текст вопроса`);
         }
 
-        if (type !== 'single_choice' && type !== 'text_input') {
+        if (type !== 'single_choice' && type !== 'text_input' && type !== 'sentence_order') {
             throw new Error(`Вопрос #${index + 1}: неизвестный тип вопроса`);
         }
 
@@ -100,8 +101,8 @@ const validateAndNormalizeQuestions = (questions = []) => {
                 }))
                 : [];
 
-            if (options.length !== 4) {
-                throw new Error(`Вопрос #${index + 1}: нужно ровно 4 варианта ответа`);
+            if (options.length < 3) {
+                throw new Error(`Вопрос #${index + 1}: нужно минимум 3 варианта ответа`);
             }
 
             if (options.some((option) => !option.text)) {
@@ -125,6 +126,10 @@ const validateAndNormalizeQuestions = (questions = []) => {
         const correctText = String(question.correctText || '').trim();
         if (!correctText) {
             throw new Error(`Вопрос #${index + 1}: укажите правильный текстовый ответ`);
+        }
+
+        if (type === 'sentence_order' && !SENTENCE_ALLOWED_RE.test(correctText)) {
+            throw new Error(`Вопрос #${index + 1}: предложение не должно содержать знаков препинания`);
         }
 
         return {

@@ -4,10 +4,38 @@ import fetch from "node-fetch";
 import FormData from "form-data";
 import mongoose from "mongoose";
 import { generateUsageExamplesForWord, normalizeUsageExamples } from "../services/usageExamples.service.js";
+import {
+    findExternalWordByEnglishLabel,
+    findExternalWordById,
+    getExternalWordSource,
+    getExternalWordSourceHealth,
+    isExternalWordId
+} from "../services/externalWordSource.service.js";
+import { buildWordTitleCase, resolveRichDescription } from "../services/wordDescription.service.js";
 
 dotenv.config();
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
+
+export const recognizeSourceHealth = async (req, res) => {
+    try {
+        const forceRefresh = String(req.query?.refresh || "").toLowerCase() === "true";
+        if (forceRefresh) {
+            await getExternalWordSource({ forceRefresh: true });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: getExternalWordSourceHealth()
+        });
+    } catch (err) {
+        return res.status(200).json({
+            success: false,
+            data: getExternalWordSourceHealth(),
+            message: err?.message || "Не удалось получить статус источника"
+        });
+    }
+};
 
 export const generateUsageExamples = async (req, res) => {
     try {
@@ -16,12 +44,16 @@ export const generateUsageExamples = async (req, res) => {
         if (!wordId) {
             return res.status(400).json({ message: "wordId обязателен" });
         }
-        if (!mongoose.Types.ObjectId.isValid(wordId)) {
+
+        let foundWord = null;
+        if (isExternalWordId(wordId)) {
+            foundWord = await findExternalWordById(wordId);
+        } else if (mongoose.Types.ObjectId.isValid(wordId)) {
+            foundWord = await Word.findOne({ _id: wordId, isActive: true })
+                .select("nameRu nameTatar usageExamples");
+        } else {
             return res.status(400).json({ message: "Некорректный wordId" });
         }
-
-        const foundWord = await Word.findOne({ _id: wordId, isActive: true })
-            .select("nameRu nameTatar usageExamples");
 
         if (!foundWord) {
             return res.status(404).json({ message: "Слово не найдено" });
@@ -57,10 +89,6 @@ export const recognizeImage = async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ message: "Загрузите фото" });
         }
-
-        const allWords = await Word.find({ isActive: true });
-        const DB_LABELS = allWords.map(w => w.nameEn?.trim()).filter(Boolean);
-        console.log("📚 Слов в БД (isActive:true):", DB_LABELS);
 
         // Формируем form-data
         const formData = new FormData();
@@ -104,48 +132,90 @@ export const recognizeImage = async (req, res) => {
             "Labrador retriever": "Dog",
             "orange": "Orange",
             "apple": "Apple",
-            // добавь остальные категории по необходимости
+            "computer keyboard": "Keyboard",
+            "keypad": "Keyboard",
+            "computer mouse": "Computer mouse",
+            "mouse": "Mouse",
+            "notebook": "Laptop",
+            "laptop": "Laptop",
+            "screen": "Monitor",
+            "monitor": "Monitor",
+            "web site": "Computer",
+            "desktop computer": "Computer",
+            "printer": "Printer",
+            "scanner": "Scanner",
+            "projector": "Projector",
+            "backpack": "Backpack",
+            "rucksack": "Backpack",
+            "pencil": "Pencil",
+            "ballpoint": "Pen",
+            "ballpoint pen": "Pen",
+            "water bottle": "Bottle",
+            "desk": "Desk",
+            "dining table": "Table",
+            "table": "Table",
+            "bookcase": "Bookshelf",
+            "bookshelf": "Bookshelf"
         };
 
         // Нормализуем labels
         const labelsFromML = mlResult
-            .map(r => LABEL_MAP[r.label] || r.label)
+            .map((r) => LABEL_MAP[r.label] || r.label)
             .filter(Boolean);
 
         console.log("🔍 Нормализованные labels:", labelsFromML);
 
-        // Поиск слова в БД
+        // Ищем только по внешнему словарю; ошибки источника превращаем в мягкий отказ.
         let foundWord = null;
         let bestScore = 0;
-        for (const label of labelsFromML) {
-            const match = allWords.find(w => w.nameEn?.trim().toLowerCase() === label.toLowerCase());
-            if (match) {
-                foundWord = match;
-                bestScore = mlResult.find(r => r.label === label)?.score || 0;
-                break;
+
+        try {
+            for (const label of labelsFromML) {
+                const match = await findExternalWordByEnglishLabel(label);
+                if (match) {
+                    foundWord = match;
+                    bestScore = mlResult.find((r) => (LABEL_MAP[r.label] || r.label) === label)?.score || 0;
+                    break;
+                }
             }
+        } catch (sourceErr) {
+            console.warn("⚠️ Внешний словарь недоступен:", sourceErr?.message || sourceErr);
+            return res.status(200).json({
+                success: false,
+                message: "Внешний словарь временно недоступен. Попробуйте позже.",
+                reason: "source_unavailable",
+                detectedLabels: labelsFromML
+            });
         }
 
         if (!foundWord) {
             return res.status(200).json({
                 success: false,
                 message: "Предмет не опознан или отсутствует в словаре",
+                reason: "not_found_in_dictionary",
                 detectedLabels: labelsFromML
             });
         }
 
-        console.log("✅ Найдено слово в БД:", foundWord.nameEn, "score:", bestScore);
+        console.log("✅ Найдено слово:", foundWord.nameEn, "score:", bestScore, "source:", foundWord.source);
         const usageExamples = normalizeUsageExamples(foundWord.usageExamples);
+        const description = await resolveRichDescription({
+            wordId: foundWord.id || foundWord._id,
+            wordRu: foundWord.nameRu,
+            wordTatar: foundWord.nameTatar,
+            wordEn: foundWord.nameEn,
+            existingDescription: foundWord.descriptionRu || foundWord.description
+        });
 
         return res.status(200).json({
             success: true,
             data: {
-                id: foundWord._id,
-                nameRu: foundWord.nameRu,
+                id: foundWord.id || foundWord._id,
+                nameRu: buildWordTitleCase(foundWord.nameRu),
                 nameEn: foundWord.nameEn,
-                nameTatar: foundWord.nameTatar,
+                nameTatar: buildWordTitleCase(foundWord.nameTatar),
                 transcription: foundWord.transcription,
-                description: foundWord.descriptionRu,
+                description,
                 usageExamples,
                 score: bestScore
             }

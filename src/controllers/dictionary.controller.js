@@ -2,23 +2,39 @@ import UserWord from '../models/UserWord.js';
 import User from '../models/User.js';
 import { checkAchievements } from '../utils/achievements.js';
 import { addScanPoints, applyDailyStreakOnScan, ensureLegacyPoints } from '../utils/userProgress.js';
+import { findExternalWordById, isExternalWordId, toWordSnapshot } from '../services/externalWordSource.service.js';
+import { normalizeUserWordForResponse, normalizeUserWordsForResponse } from '../services/userWordPresenter.service.js';
 
 export const addToDictionary = async (req, res) => {
-    const { wordId } = req.body;
+    const wordId = String(req.body?.wordId || '').trim();
+    if (!wordId) {
+        return res.status(400).json({ message: 'wordId обязателен' });
+    }
 
-    const exists = await UserWord.findOne({
-        user: req.user.id,
-        word: wordId
-    });
+    const isExternal = isExternalWordId(wordId);
+    const exists = await UserWord.findOne(isExternal
+        ? { user: req.user.id, externalWordId: wordId }
+        : { user: req.user.id, word: wordId }
+    );
 
     if (exists) {
         return res.status(400).json({ message: 'Слово уже добавлено' });
     }
 
-    const userWord = await UserWord.create({
-        user: req.user.id,
-        word: wordId
-    });
+    const createPayload = { user: req.user.id };
+    if (isExternal) {
+        const externalWord = await findExternalWordById(wordId);
+        if (!externalWord) {
+            return res.status(404).json({ message: 'Слово не найдено' });
+        }
+
+        createPayload.externalWordId = wordId;
+        createPayload.wordSnapshot = toWordSnapshot(externalWord);
+    } else {
+        createPayload.word = wordId;
+    }
+
+    const userWord = await UserWord.create(createPayload);
 
     const user = await User.findById(req.user.id);
     user.dictionary.push(userWord._id);
@@ -28,7 +44,7 @@ export const addToDictionary = async (req, res) => {
 
     await user.save();
 
-    res.json(userWord);
+    res.json(normalizeUserWordForResponse(userWord));
 };
 
 export const getDictionary = async (req, res) => {
@@ -41,7 +57,7 @@ export const getDictionary = async (req, res) => {
     const words = await UserWord.find({ user: req.user.id })
         .populate('word');
 
-    res.json(words);
+    res.json(normalizeUserWordsForResponse(words));
 };
 
 export const getDictionaryItem = async (req, res) => {
@@ -54,5 +70,5 @@ export const getDictionaryItem = async (req, res) => {
         return res.status(404).json({ message: 'Слово не найдено' });
     }
 
-    res.json(item);
+    res.json(normalizeUserWordForResponse(item));
 };

@@ -12,6 +12,7 @@ import { buildContentBlocksForRead } from '../utils/topicContent.js';
 const TOPIC_POINTS = 3;
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
+const normalizeWordOrderText = (value) => normalizeText(value).split(/\s+/).filter(Boolean).join(' ');
 const getCourseCategoryIds = (course) => {
     const fromArray = Array.isArray(course?.categoryIds) ? course.categoryIds : [];
     const normalizedArray = fromArray
@@ -77,6 +78,16 @@ const buildQuestionPublicPayload = (question) => {
             type: question.type,
             points: question.points,
             options: question.options.map((option) => ({ text: option.text }))
+        };
+    }
+
+    if (question.type === 'sentence_order') {
+        return {
+            _id: question._id,
+            title: question.title,
+            type: question.type,
+            points: question.points,
+            sentenceText: question.correctText
         };
     }
 
@@ -313,6 +324,9 @@ export const submitTopicQuiz = async (req, res) => {
                 selectedOptionIndex = Number.isInteger(inputIndex) ? inputIndex : null;
                 const correctIndex = question.options.findIndex((option) => option.isCorrect);
                 isCorrect = selectedOptionIndex === correctIndex;
+            } else if (question.type === 'sentence_order') {
+                answerText = String(userAnswer?.answerText || '');
+                isCorrect = normalizeWordOrderText(answerText) === normalizeWordOrderText(question.correctText);
             } else {
                 answerText = String(userAnswer?.answerText || '');
                 isCorrect = normalizeText(answerText) === normalizeText(question.correctText);

@@ -40,6 +40,7 @@ const normalizeCategoryIds = (rawCategoryIds, rawCategoryId) => {
 
     return unique;
 };
+const SENTENCE_ALLOWED_RE = /^[\p{L}\p{N}\s-]+$/u;
 
 const validateAndNormalizeQuestions = (questions = []) => {
     if (!Array.isArray(questions) || questions.length === 0) {
@@ -52,7 +53,7 @@ const validateAndNormalizeQuestions = (questions = []) => {
         const points = Number(question.points) > 0 ? Number(question.points) : 1;
 
         if (!title) throw new Error(`Вопрос #${index + 1}: заполните текст вопроса`);
-        if (type !== 'single_choice' && type !== 'text_input') {
+        if (type !== 'single_choice' && type !== 'text_input' && type !== 'sentence_order') {
             throw new Error(`Вопрос #${index + 1}: неизвестный тип вопроса`);
         }
 
@@ -63,7 +64,7 @@ const validateAndNormalizeQuestions = (questions = []) => {
                     isCorrect: Boolean(option.isCorrect)
                 }))
                 : [];
-            if (options.length !== 4) throw new Error(`Вопрос #${index + 1}: нужно ровно 4 варианта ответа`);
+            if (options.length < 3) throw new Error(`Вопрос #${index + 1}: нужно минимум 3 варианта ответа`);
             if (options.some((option) => !option.text)) {
                 throw new Error(`Вопрос #${index + 1}: все варианты должны быть заполнены`);
             }
@@ -76,6 +77,9 @@ const validateAndNormalizeQuestions = (questions = []) => {
 
         const correctText = String(question.correctText || '').trim();
         if (!correctText) throw new Error(`Вопрос #${index + 1}: укажите правильный текстовый ответ`);
+        if (type === 'sentence_order' && !SENTENCE_ALLOWED_RE.test(correctText)) {
+            throw new Error(`Вопрос #${index + 1}: предложение не должно содержать знаков препинания`);
+        }
         return { title, type, points, options: [], correctText };
     });
 };

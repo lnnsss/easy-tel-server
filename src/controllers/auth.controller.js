@@ -18,6 +18,7 @@ import {
 import { sendPasswordResetEmail, sendVerificationCodeEmail } from '../services/mailer.js';
 import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.js';
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
+import { normalizeUserWordsForResponse } from '../services/userWordPresenter.service.js';
 
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -578,8 +579,11 @@ export const profile = async (req, res) => {
         && !latestAuthorRequest.decisionSeenAt
     ) ? latestAuthorRequest : null;
 
+    const profileData = user.toObject();
+    profileData.dictionary = normalizeUserWordsForResponse(profileData.dictionary);
+
     res.json({
-        ...user.toObject(),
+        ...profileData,
         analytics,
         latestAuthorRequest: latestAuthorRequest || null,
         authorRequestNotice
