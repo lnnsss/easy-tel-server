@@ -1,44 +1,114 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 export const CHARACTER_GENDERS = ['male', 'female'];
-
-export const CHARACTER_FILES = ['Алмаз.png', 'Алсу.png'];
-export const SHOES_FILES = ['Найки.png', 'Кеды.png', 'Тимбы.png', 'Баленси XXL.png', 'Доктор Мартинс.png', 'Базовая.png'];
-export const BOTTOM_FILES = ['Спортивки.png', 'Как у фараона.png', 'Милашки треники.png', 'Свага джинсы.png', 'Рваные джинсы.png', 'Карго дефолт.png', 'Базовые.png'];
-export const TOP_FILES = ['Худи.png', 'Бомбер.png', 'Мамин свитер.png', 'Тишка Казань.png', 'Тишка йорик.png', 'Линейный свитер.png', 'Базовый.png', 'Базовая.png', 'Зелёнка.png'];
-export const HEADDRESS_FILES = ['Ушанка.png', 'Ай мачо хед.png', 'Кепка XXL.png', 'Тубетейка.png', 'Базовый.png'];
-export const BACKGROUND_FILES = ['__theme__', 'neegers.jpg', 'fire.jpg', 'dungeonMaster.jpg', 'fine.jpg', 'spongeBob.jpg', 'casino.jpg', 'classic.jpg', 'office.jpg', 'simpson.jpg', 'png.jpg', 'cover.jpg', 'toilet.jpg'];
 export const ITEM_PRICE_COINS = 5;
-export const COSMETIC_CATEGORIES = ['shoes', 'bottom', 'top', 'headdress'];
+export const COSMETIC_CATEGORIES = ['shoes', 'bottom', 'top', 'headdress', 'background'];
 
-export const FREE_ITEMS_WHITELIST = {
+const STATIC_FREE_ITEMS_WHITELIST = {
     shoes: ['Базовая.png'],
     bottom: ['Базовые.png'],
     top: ['Базовая.png'],
-    headdress: ['Базовый.png']
+    headdress: ['Базовый.png'],
+    background: ['__theme__']
 };
 
-export const DEFAULT_CHARACTER_CUSTOMIZATION = {
-    gender: 'male',
-    characterFile: 'Алмаз.png',
-    shoesFile: 'Базовая.png',
-    bottomFile: 'Базовые.png',
-    topFile: 'Базовая.png',
-    headdressFile: 'Базовый.png',
-    backgroundFile: '__theme__'
+const STATIC_GENDER_DEFAULTS = {
+    male: 'Алмаз.png',
+    female: 'Алсу.png'
 };
 
-export const CHARACTER_ALLOWED = {
-    gender: new Set(CHARACTER_GENDERS),
-    characterFile: new Set(CHARACTER_FILES),
-    shoesFile: new Set(SHOES_FILES),
-    bottomFile: new Set(BOTTOM_FILES),
-    topFile: new Set(TOP_FILES),
-    headdressFile: new Set(HEADDRESS_FILES),
-    backgroundFile: new Set(BACKGROUND_FILES)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const customizeRoot = path.resolve(__dirname, '..', '..', '..', 'client', 'public', 'customize');
+const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|svg)$/i;
+
+const readAssetFolder = (folderName) => {
+    const folderPath = path.join(customizeRoot, folderName);
+    try {
+        const files = fs.readdirSync(folderPath, { withFileTypes: true })
+            .filter((entry) => entry.isFile() && IMAGE_EXT_RE.test(entry.name))
+            .map((entry) => entry.name)
+            .sort((a, b) => a.localeCompare(b, 'ru'));
+        return files;
+    } catch (err) {
+        console.error('[character-assets] read error', folderName, err?.message || err);
+        return [];
+    }
 };
 
-export const COSMETIC_ALLOWED = {
-    shoes: new Set(SHOES_FILES),
-    bottom: new Set(BOTTOM_FILES),
-    top: new Set(TOP_FILES),
-    headdress: new Set(HEADDRESS_FILES)
+const pickDefault = (files, preferred) => {
+    if (preferred && files.includes(preferred)) return preferred;
+    return files[0] || '';
+};
+
+const buildFreeWhitelist = (filesByCategory) => {
+    const result = {};
+    for (const category of COSMETIC_CATEGORIES) {
+        const files = filesByCategory[category] || [];
+        const staticFree = STATIC_FREE_ITEMS_WHITELIST[category] || [];
+        const matched = staticFree.filter((item) => files.includes(item));
+        result[category] = matched.length > 0 ? matched : (files[0] ? [files[0]] : []);
+    }
+    return result;
+};
+
+export const getCharacterAssetsConfig = () => {
+    const characters = readAssetFolder('characters');
+    const shoes = readAssetFolder('shoes');
+    const bottom = readAssetFolder('bottom');
+    const top = readAssetFolder('top');
+    const headdress = readAssetFolder('headdress');
+    const backgrounds = ['__theme__', ...readAssetFolder('backgrounds')];
+
+    const genderDefaults = {
+        male: pickDefault(characters, STATIC_GENDER_DEFAULTS.male),
+        female: pickDefault(characters, STATIC_GENDER_DEFAULTS.female || characters[1] || characters[0] || '')
+    };
+
+    const freeItemsWhitelist = buildFreeWhitelist({ shoes, bottom, top, headdress, background: backgrounds });
+    const defaults = {
+        gender: 'male',
+        characterFile: pickDefault(characters, genderDefaults.male),
+        shoesFile: pickDefault(shoes, freeItemsWhitelist.shoes[0]),
+        bottomFile: pickDefault(bottom, freeItemsWhitelist.bottom[0]),
+        topFile: pickDefault(top, freeItemsWhitelist.top[0]),
+        headdressFile: pickDefault(headdress, freeItemsWhitelist.headdress[0]),
+        backgroundFile: backgrounds.includes('__theme__') ? '__theme__' : (backgrounds[0] || '')
+    };
+
+    const characterAllowed = {
+        gender: new Set(CHARACTER_GENDERS),
+        characterFile: new Set(characters),
+        shoesFile: new Set(shoes),
+        bottomFile: new Set(bottom),
+        topFile: new Set(top),
+        headdressFile: new Set(headdress),
+        backgroundFile: new Set(backgrounds)
+    };
+
+    const cosmeticAllowed = {
+        shoes: new Set(shoes),
+        bottom: new Set(bottom),
+        top: new Set(top),
+        headdress: new Set(headdress),
+        background: new Set(backgrounds)
+    };
+
+    return {
+        assets: {
+            genderDefaults,
+            characters,
+            shoes,
+            bottom,
+            top,
+            headdress,
+            backgrounds
+        },
+        freeItemsWhitelist,
+        defaults,
+        characterAllowed,
+        cosmeticAllowed
+    };
 };

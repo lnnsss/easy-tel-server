@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+    characterAssets,
     forgotPassword,
     googleAuthCallback,
     googleAuthStart,
@@ -26,6 +27,7 @@ router.post('/reset-password', resetPassword);
 router.get('/google', googleAuthStart);
 router.get('/google/callback', googleAuthCallback);
 router.get('/profile', auth, profile);
+router.get('/character-assets', auth, characterAssets);
 router.patch('/profile', auth, updateProfile);
 router.post(
     '/avatar',

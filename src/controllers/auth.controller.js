@@ -20,11 +20,8 @@ import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.j
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 import { normalizeUserWordsForResponse } from '../services/userWordPresenter.service.js';
 import {
-    CHARACTER_ALLOWED,
-    COSMETIC_ALLOWED,
     COSMETIC_CATEGORIES,
-    DEFAULT_CHARACTER_CUSTOMIZATION,
-    FREE_ITEMS_WHITELIST,
+    getCharacterAssetsConfig,
     ITEM_PRICE_COINS
 } from '../config/characterAssets.js';
 
@@ -101,9 +98,10 @@ const buildUniqueUsername = async (baseUsername) => {
 };
 
 const buildDefaultOwnedCosmetics = () => {
+    const { freeItemsWhitelist } = getCharacterAssetsConfig();
     const result = {};
     for (const category of COSMETIC_CATEGORIES) {
-        result[category] = Array.isArray(FREE_ITEMS_WHITELIST[category]) ? [...FREE_ITEMS_WHITELIST[category]] : [];
+        result[category] = Array.isArray(freeItemsWhitelist[category]) ? [...freeItemsWhitelist[category]] : [];
     }
     return result;
 };
@@ -507,6 +505,12 @@ export const googleAuthCallback = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
     try {
+        const {
+            defaults: defaultCharacterCustomization,
+            freeItemsWhitelist,
+            characterAllowed,
+            cosmeticAllowed
+        } = getCharacterAssetsConfig();
         const { firstName, lastName, username, characterCustomization, purchaseItem } = req.body || {};
         const updates = {};
 
@@ -520,7 +524,7 @@ export const updateProfile = async (req, res) => {
             currentUser.ownedCosmetics = {};
         }
         for (const category of COSMETIC_CATEGORIES) {
-            const freeItems = Array.isArray(FREE_ITEMS_WHITELIST[category]) ? FREE_ITEMS_WHITELIST[category] : [];
+            const freeItems = Array.isArray(freeItemsWhitelist[category]) ? freeItemsWhitelist[category] : [];
             const current = Array.isArray(currentUser.ownedCosmetics[category]) ? currentUser.ownedCosmetics[category] : [];
             currentUser.ownedCosmetics[category] = [...new Set([...freeItems, ...current])];
         }
@@ -567,11 +571,11 @@ export const updateProfile = async (req, res) => {
             if (!COSMETIC_CATEGORIES.includes(category)) {
                 return res.status(400).json({ message: 'Недопустимая категория для покупки' });
             }
-            if (!COSMETIC_ALLOWED[category]?.has(file)) {
+            if (!cosmeticAllowed[category]?.has(file)) {
                 return res.status(400).json({ message: 'Недопустимый файл для покупки' });
             }
 
-            const freeItems = new Set(FREE_ITEMS_WHITELIST[category] || []);
+            const freeItems = new Set(freeItemsWhitelist[category] || []);
             const owned = new Set(Array.isArray(currentUser.ownedCosmetics[category]) ? currentUser.ownedCosmetics[category] : []);
             const alreadyOwned = freeItems.has(file) || owned.has(file);
             if (!alreadyOwned) {
@@ -591,14 +595,14 @@ export const updateProfile = async (req, res) => {
             }
 
             const merged = {
-                ...DEFAULT_CHARACTER_CUSTOMIZATION,
+                ...defaultCharacterCustomization,
                 ...characterCustomization
             };
 
             const fields = ['gender', 'characterFile', 'shoesFile', 'bottomFile', 'topFile', 'headdressFile', 'backgroundFile'];
             for (const field of fields) {
                 const value = String(merged[field] || '').trim();
-                const whitelist = CHARACTER_ALLOWED[field];
+                const whitelist = characterAllowed[field];
                 if (!whitelist || !whitelist.has(value)) {
                     return res.status(400).json({ message: `Недопустимое значение для ${field}` });
                 }
@@ -609,11 +613,12 @@ export const updateProfile = async (req, res) => {
                 shoesFile: 'shoes',
                 bottomFile: 'bottom',
                 topFile: 'top',
-                headdressFile: 'headdress'
+                headdressFile: 'headdress',
+                backgroundFile: 'background'
             };
             for (const [field, category] of Object.entries(ownershipMap)) {
                 const selected = merged[field];
-                const freeItems = new Set(FREE_ITEMS_WHITELIST[category] || []);
+                const freeItems = new Set(freeItemsWhitelist[category] || []);
                 const owned = new Set(Array.isArray(currentUser.ownedCosmetics[category]) ? currentUser.ownedCosmetics[category] : []);
                 if (!freeItems.has(selected) && !owned.has(selected)) {
                     return res.status(400).json({ message: `Сначала купите «${selected}»` });
@@ -703,5 +708,16 @@ export const profile = async (req, res) => {
         analytics,
         latestAuthorRequest: latestAuthorRequest || null,
         authorRequestNotice
+    });
+};
+
+export const characterAssets = async (_req, res) => {
+    const { assets, defaults, freeItemsWhitelist } = getCharacterAssetsConfig();
+    return res.json({
+        assets,
+        defaults,
+        freeItemsWhitelist,
+        itemPriceCoins: ITEM_PRICE_COINS,
+        paidCategories: COSMETIC_CATEGORIES
     });
 };

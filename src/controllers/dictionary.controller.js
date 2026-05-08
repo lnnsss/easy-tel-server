@@ -48,16 +48,35 @@ export const addToDictionary = async (req, res) => {
 };
 
 export const getDictionary = async (req, res) => {
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const skip = (page - 1) * limit;
+
     const user = await User.findById(req.user.id).select('dictionary scanPoints studyPoints totalPoints rank');
     if (user) {
         ensureLegacyPoints(user);
         await user.save();
     }
 
-    const words = await UserWord.find({ user: req.user.id })
-        .populate('word');
+    const [totalItems, words] = await Promise.all([
+        UserWord.countDocuments({ user: req.user.id }),
+        UserWord.find({ user: req.user.id })
+            .sort({ learnedAt: -1, _id: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('word')
+    ]);
 
-    res.json(normalizeUserWordsForResponse(words));
+    const totalPages = Math.max(Math.ceil(totalItems / limit), 1);
+    const items = normalizeUserWordsForResponse(words);
+
+    res.json({
+        items,
+        totalItems,
+        totalPages,
+        currentPage: page,
+        hasMore: page < totalPages
+    });
 };
 
 export const getDictionaryItem = async (req, res) => {

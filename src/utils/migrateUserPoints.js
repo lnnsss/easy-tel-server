@@ -1,8 +1,9 @@
 import User from '../models/User.js';
 import { ensureLegacyPoints } from './userProgress.js';
-import { COSMETIC_CATEGORIES, FREE_ITEMS_WHITELIST } from '../config/characterAssets.js';
+import { COSMETIC_CATEGORIES, getCharacterAssetsConfig } from '../config/characterAssets.js';
 
 export const migrateUserPoints = async () => {
+    const { freeItemsWhitelist } = getCharacterAssetsConfig();
     const users = await User.find().select('_id dictionary scanPoints studyPoints totalPoints rank coins ownedCosmetics');
     if (!users.length) return;
 
@@ -17,7 +18,7 @@ export const migrateUserPoints = async () => {
             user.ownedCosmetics = {};
         }
         for (const category of COSMETIC_CATEGORIES) {
-            const freeItems = Array.isArray(FREE_ITEMS_WHITELIST[category]) ? FREE_ITEMS_WHITELIST[category] : [];
+            const freeItems = Array.isArray(freeItemsWhitelist[category]) ? freeItemsWhitelist[category] : [];
             const current = Array.isArray(user.ownedCosmetics[category]) ? user.ownedCosmetics[category] : [];
             user.ownedCosmetics[category] = [...new Set([...freeItems, ...current])];
         }
