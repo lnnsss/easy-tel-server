@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 export const CHARACTER_GENDERS = ['male', 'female'];
-export const ITEM_PRICE_COINS = 5;
+export const ITEM_PRICE_COINS = 10;
 export const COSMETIC_CATEGORIES = ['shoes', 'bottom', 'top', 'headdress', 'background'];
 
 const STATIC_FREE_ITEMS_WHITELIST = {

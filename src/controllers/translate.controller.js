@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import https from 'https';
 import { getTatsoftTimeoutMs, translateWithTatsoft } from '../services/tatsoft.service.js';
+import { trackAchievementEvent } from '../services/achievements.service.js';
 
 const ALLOWED_DIRECTIONS = new Set(['rus2tat', 'tat2rus']);
 const ALLOWED_SPEAKERS = new Set(['almaz', 'alsu']);
@@ -94,13 +95,15 @@ export const translateText = async (req, res) => {
         }
 
         const translationResult = await translateWithTatsoft({ direction, text, timeoutMs });
+        const achievementResult = req.user?.id ? await trackAchievementEvent({ userId: req.user.id, eventType: 'translator_used' }) : { unlockedNow: [] };
 
         return res.json({
             translation: translationResult.translation,
             meta: {
                 endpointUsed: translationResult.endpointUsed,
                 durationMs: translationResult.durationMs
-            }
+            },
+            unlockedNow: achievementResult.unlockedNow || []
         });
     } catch (err) {
         const message = String(err?.message || '');
@@ -135,6 +138,7 @@ export const synthesizeSpeech = async (req, res) => {
             speaker,
             timeoutMs
         });
+        const achievementResult = req.user?.id ? await trackAchievementEvent({ userId: req.user.id, eventType: 'tts_used' }) : { unlockedNow: [] };
 
         return res.json({
             wavBase64: tts.wavBase64,
@@ -142,7 +146,8 @@ export const synthesizeSpeech = async (req, res) => {
             meta: {
                 speaker,
                 durationMs: tts.durationMs
-            }
+            },
+            unlockedNow: achievementResult.unlockedNow || []
         });
     } catch (err) {
         const message = String(err?.message || '');

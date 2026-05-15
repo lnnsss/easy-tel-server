@@ -9,6 +9,7 @@ import {
     getConversationUnreadCountForUser,
     getTotalUnreadCountForUser
 } from '../utils/socialGraph.js';
+import { trackAchievementEvent } from '../services/achievements.service.js';
 
 let ioInstance = null;
 
@@ -101,6 +102,10 @@ const handleSendMessage = (socket) => async (payload = {}) => {
             conversationId: message.conversationId,
             senderId: message.senderId,
             text: message.text,
+            messageType: message.messageType || 'text',
+            audioUrl: message.audioUrl || null,
+            audioDurationSec: Number.isFinite(message.audioDurationSec) ? message.audioDurationSec : null,
+            listenedBy: Array.isArray(message.listenedBy) ? message.listenedBy : [],
             readBy: message.readBy,
             createdAt: message.createdAt
         };
@@ -111,6 +116,7 @@ const handleSendMessage = (socket) => async (payload = {}) => {
         ioInstance.to(`user:${socket.user.id}`).emit('chat:new', outgoing);
         await emitUnread(partnerId, conversationId);
         await emitUnread(socket.user.id, conversationId);
+        await trackAchievementEvent({ userId: socket.user.id, eventType: 'message_sent' });
     } catch (err) {
         console.error('socket chat:send error', err);
         socket.emit('chat:error', { message: 'Ошибка отправки сообщения' });

@@ -19,6 +19,7 @@ import { sendPasswordResetEmail, sendVerificationCodeEmail } from '../services/m
 import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.js';
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 import { normalizeUserWordsForResponse } from '../services/userWordPresenter.service.js';
+import { trackAchievementEvent } from '../services/achievements.service.js';
 import {
     COSMETIC_CATEGORIES,
     getCharacterAssetsConfig,
@@ -57,6 +58,7 @@ const hashString = (value) => crypto.createHash('sha256').update(value).digest('
 const generateVerificationCode = () => String(Math.floor(100000 + Math.random() * 900000));
 
 const generateResetToken = () => crypto.randomBytes(32).toString('hex');
+const generateReferralCode = () => crypto.randomBytes(5).toString('hex').toUpperCase();
 
 const ensureGoogleConfigured = () => (
     process.env.GOOGLE_CLIENT_ID
@@ -97,6 +99,15 @@ const buildUniqueUsername = async (baseUsername) => {
     return finalCandidate;
 };
 
+const buildUniqueReferralCode = async () => {
+    for (let i = 0; i < 10; i += 1) {
+        const code = generateReferralCode();
+        const exists = await User.exists({ referralCode: code });
+        if (!exists) return code;
+    }
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
+};
+
 const buildDefaultOwnedCosmetics = () => {
     const { freeItemsWhitelist } = getCharacterAssetsConfig();
     const result = {};
@@ -113,7 +124,8 @@ export const register = async (req, res) => {
             password,
             username,
             firstName,
-            lastName
+            lastName,
+            referralCode
         } = req.body;
 
         if (!email || !password || !username || !firstName || !lastName) {
@@ -158,6 +170,8 @@ export const register = async (req, res) => {
         const verificationExpiresAt = new Date(Date.now() + VERIFICATION_CODE_TTL_MS);
 
         const hash = await bcrypt.hash(password, 10);
+        const normalizedReferralCode = String(referralCode || '').trim().toUpperCase();
+        const inviter = normalizedReferralCode ? await User.findOne({ referralCode: normalizedReferralCode }).select('_id coins referralsCount') : null;
 
         const user = await User.create({
             email: normalizedEmail,
@@ -170,8 +184,17 @@ export const register = async (req, res) => {
             lastName: normalizedLastName,
             role: 'user',
             coins: 0,
-            ownedCosmetics: buildDefaultOwnedCosmetics()
+            ownedCosmetics: buildDefaultOwnedCosmetics(),
+            referralCode: await buildUniqueReferralCode(),
+            referredBy: inviter?._id || null
         });
+
+        if (inviter && String(inviter._id) !== String(user._id)) {
+            inviter.referralsCount = (Number(inviter.referralsCount) || 0) + 1;
+            inviter.coins = (Number(inviter.coins) || 0) + 10;
+            await inviter.save();
+            await trackAchievementEvent({ userId: inviter._id, eventType: 'referral_invited' });
+        }
 
         const token = createJwtToken(user);
         res.json({
@@ -233,9 +256,11 @@ export const login = async (req, res) => {
 
         const token = createJwtToken(user);
 
+        const achievementResult = await trackAchievementEvent({ userId: user._id, eventType: 'login' });
         res.json({
             token,
-            emailVerified: user.emailVerified
+            emailVerified: user.emailVerified,
+            unlockedNow: achievementResult.unlockedNow || []
         });
     } catch (err) {
         logAuthError('login', err, req.body);
@@ -469,7 +494,8 @@ export const googleAuthCallback = async (req, res) => {
                 password: passwordHash,
                 role: 'user',
                 coins: 0,
-                ownedCosmetics: buildDefaultOwnedCosmetics()
+                ownedCosmetics: buildDefaultOwnedCosmetics(),
+                referralCode: await buildUniqueReferralCode()
             });
         } else {
             let requiresSave = false;
@@ -488,6 +514,11 @@ export const googleAuthCallback = async (req, res) => {
             // Обновляем аватар из Google, если пользователь не ставил локальный вручную.
             if (hasGooglePicture && (!user.avatarUrl || (!hasLocalAvatar && hasGoogleAvatar))) {
                 user.avatarUrl = picture;
+                requiresSave = true;
+            }
+
+            if (!user.referralCode) {
+                user.referralCode = await buildUniqueReferralCode();
                 requiresSave = true;
             }
 
@@ -511,7 +542,7 @@ export const updateProfile = async (req, res) => {
             characterAllowed,
             cosmeticAllowed
         } = getCharacterAssetsConfig();
-        const { firstName, lastName, username, characterCustomization, purchaseItem } = req.body || {};
+        const { firstName, lastName, username, profileAccentColor, characterCustomization, purchaseItem } = req.body || {};
         const updates = {};
 
         const currentUser = await User.findById(req.user.id)
@@ -544,6 +575,15 @@ export const updateProfile = async (req, res) => {
             const lastNameError = validateName(normalizedLastName);
             if (lastNameError) return res.status(400).json({ message: lastNameError });
             updates.lastName = normalizedLastName;
+        }
+
+
+        if (profileAccentColor !== undefined) {
+            const normalizedColor = String(profileAccentColor || '').trim();
+            if (!/^#[0-9a-fA-F]{6}$/.test(normalizedColor)) {
+                return res.status(400).json({ message: 'Некорректный цвет профиля' });
+            }
+            updates.profileAccentColor = normalizedColor.toLowerCase();
         }
 
         if (username !== undefined) {
@@ -638,10 +678,12 @@ export const updateProfile = async (req, res) => {
         Object.assign(currentUser, updates);
         await currentUser.save();
 
+        const achievementResult = await trackAchievementEvent({ userId: currentUser._id, eventType: 'profile_updated' });
+
         const user = await User.findById(currentUser._id)
             .select('-password -emailVerificationCodeHash -passwordResetTokenHash');
 
-        return res.json({ message: 'Профиль обновлен', user });
+        return res.json({ message: 'Профиль обновлен', user, unlockedNow: achievementResult.unlockedNow || [] });
     } catch (err) {
         logAuthError('updateProfile', err, req.body);
         return res.status(500).json({ message: 'Ошибка обновления профиля', details: err?.message });
@@ -660,13 +702,16 @@ export const uploadAvatar = async (req, res) => {
         user.avatarUrl = avatarUrl;
         await user.save();
 
+        const achievementResult = await trackAchievementEvent({ userId: user._id, eventType: 'avatar_changed' });
+
         if (oldAvatarUrl && oldAvatarUrl !== avatarUrl) {
             tryRemoveAvatarFile(oldAvatarUrl);
         }
 
         return res.json({
             message: 'Аватар обновлен',
-            avatarUrl
+            avatarUrl,
+            unlockedNow: achievementResult.unlockedNow || []
         });
     } catch (err) {
         logAuthError('uploadAvatar', err);
@@ -687,6 +732,10 @@ export const profile = async (req, res) => {
     }
 
     ensureLegacyPoints(user);
+    if (!user.referralCode) {
+        user.referralCode = await buildUniqueReferralCode();
+    }
+    await trackAchievementEvent({ userId: user._id, eventType: 'login' });
     normalizeUserStreak(user);
     await user.save();
 

@@ -6,6 +6,7 @@ import UserCourseProgress from '../models/UserCourseProgress.js';
 import UserTopicAttempt from '../models/UserTopicAttempt.js';
 import User from '../models/User.js';
 import { addStudyPoints, ensureLegacyPoints } from '../utils/userProgress.js';
+import { trackAchievementEvent } from '../services/achievements.service.js';
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 import { buildContentBlocksForRead } from '../utils/topicContent.js';
 
@@ -412,6 +413,24 @@ export const submitTopicQuiz = async (req, res) => {
             awardedStudyPoints
         });
 
+        let unlockedNow = [];
+        if (passed) {
+            const releaseTime = new Date();
+            const allAttemptsForTopic = await UserTopicAttempt.find({
+                userId: req.user.id,
+                topicId: topic._id,
+                createdAt: { $lte: releaseTime }
+            }).select('scorePercent passed').lean();
+            const perfect = allAttemptsForTopic.length === 0 && scorePercent === 100;
+            const oneDay = Boolean(progress.completedAt && progress.createdAt && String(progress.completedAt).slice(0, 10) === String(progress.createdAt).slice(0, 10));
+            const achTest = await trackAchievementEvent({ userId: req.user.id, eventType: 'test_passed', payload: { scorePercent } });
+            unlockedNow = [...(achTest.unlockedNow || [])];
+            if (progress.completedAt) {
+                const achCourse = await trackAchievementEvent({ userId: req.user.id, eventType: 'course_completed', payload: { perfect, oneDay } });
+                unlockedNow = [...unlockedNow, ...(achCourse.unlockedNow || [])];
+            }
+        }
+
         return res.json({
             passed,
             scorePercent,
@@ -420,7 +439,8 @@ export const submitTopicQuiz = async (req, res) => {
             feedback: resultAnswers.map((answer) => ({
                 questionId: answer.questionId,
                 isCorrect: answer.isCorrect
-            }))
+            })),
+            unlockedNow
         });
     } catch (err) {
         console.error('submitTopicQuiz error', err);

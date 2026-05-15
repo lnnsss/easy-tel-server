@@ -18,7 +18,7 @@ export const getPublicProfileByUsername = async (req, res) => {
         const user = await User.findOne({
             username: { $regex: `^${escapeRegex(username)}$`, $options: 'i' },
             role: { $ne: 'admin' }
-        }).select('avatarUrl username firstName lastName streak lastStreakDate totalPoints coins achievements rank dictionary characterCustomization ownedCosmetics');
+        }).select('avatarUrl username firstName lastName streak lastStreakDate totalPoints coins achievements rank dictionary characterCustomization ownedCosmetics profileAccentColor');
 
         if (!user) {
             return res.status(404).json({ message: 'Пользователь не найден' });
@@ -79,6 +79,7 @@ export const getPublicProfileByUsername = async (req, res) => {
                 username: user.username,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                profileAccentColor: user.profileAccentColor || null,
                 streak: Number(user.streak) || 0,
                 wordsWeek,
                 wordsTotal,

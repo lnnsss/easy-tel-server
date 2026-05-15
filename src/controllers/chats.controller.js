@@ -45,6 +45,19 @@ const emitUnreadUpdate = async (userId, conversationId) => {
     });
 };
 
+const toMessagePayload = (message) => ({
+    _id: message._id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
+    text: message.text,
+    messageType: message.messageType || 'text',
+    audioUrl: message.audioUrl || null,
+    audioDurationSec: Number.isFinite(message.audioDurationSec) ? message.audioDurationSec : null,
+    listenedBy: Array.isArray(message.listenedBy) ? message.listenedBy : [],
+    readBy: message.readBy || [],
+    createdAt: message.createdAt
+});
+
 export const getChats = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -180,12 +193,7 @@ export const getChatMessages = async (req, res) => {
         const messages = (hasMore ? rows.slice(0, limit) : rows)
             .reverse()
             .map((message) => ({
-                _id: message._id,
-                conversationId: message.conversationId,
-                senderId: message.senderId,
-                text: message.text,
-                readBy: message.readBy || [],
-                createdAt: message.createdAt
+                ...toMessagePayload(message)
             }));
 
         return res.json({
@@ -196,6 +204,149 @@ export const getChatMessages = async (req, res) => {
     } catch (err) {
         console.error('getChatMessages error', err);
         return res.status(500).json({ message: 'Ошибка загрузки сообщений' });
+    }
+};
+
+export const sendVoiceMessage = async (req, res) => {
+    try {
+        const userId = String(req.user.id);
+        const { conversationId } = req.params;
+        const durationSecRaw = Number(req.body?.durationSec);
+        const durationSec = Number.isFinite(durationSecRaw) ? Math.max(0, Math.min(600, Math.round(durationSecRaw))) : null;
+
+        const conversation = await getConversationByIdForUser(conversationId, userId);
+        if (!conversation) {
+            return res.status(404).json({ message: 'Чат не найден' });
+        }
+        if (!req.file) {
+            return res.status(400).json({ message: 'Аудио не загружено' });
+        }
+
+        const partnerId = getConversationPartnerId(conversation, userId);
+        const isFriend = await areUsersFriends(userId, partnerId);
+        if (!isFriend) {
+            return res.status(403).json({ message: 'Чат доступен только с друзьями' });
+        }
+
+        const audioUrl = `/uploads/voices/${req.file.filename}`;
+        const message = await Message.create({
+            conversationId,
+            senderId: userId,
+            text: '',
+            messageType: 'voice',
+            audioUrl,
+            audioDurationSec: durationSec,
+            listenedBy: [userId],
+            readBy: [userId]
+        });
+
+        conversation.lastMessageText = 'Голосовое сообщение';
+        conversation.lastMessageAt = message.createdAt;
+        await conversation.save();
+
+        const outgoing = toMessagePayload(message);
+
+        const io = getIO();
+        if (io) {
+            io.to(`conversation:${conversationId}`).emit('chat:new', outgoing);
+            io.to(`user:${partnerId}`).emit('chat:new', outgoing);
+            io.to(`user:${userId}`).emit('chat:new', outgoing);
+            await emitUnreadUpdate(partnerId, conversationId);
+            await emitUnreadUpdate(userId, conversationId);
+        }
+
+        return res.status(201).json({ message: outgoing });
+    } catch (err) {
+        console.error('sendVoiceMessage error', err);
+        return res.status(500).json({ message: 'Ошибка отправки голосового сообщения' });
+    }
+};
+
+export const markVoiceMessageListened = async (req, res) => {
+    try {
+        const userId = String(req.user.id);
+        const { conversationId, messageId } = req.params;
+
+        const conversation = await getConversationByIdForUser(conversationId, userId);
+        if (!conversation) return res.status(404).json({ message: 'Чат не найден' });
+
+        const message = await Message.findOne({
+            _id: messageId,
+            conversationId,
+            messageType: 'voice'
+        });
+        if (!message) return res.status(404).json({ message: 'Голосовое сообщение не найдено' });
+
+        await Message.updateOne({ _id: messageId }, { $addToSet: { listenedBy: userId } });
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('markVoiceMessageListened error', err);
+        return res.status(500).json({ message: 'Ошибка обновления статуса прослушивания' });
+    }
+};
+
+export const deleteMessage = async (req, res) => {
+    try {
+        const userId = String(req.user.id);
+        const { conversationId, messageId } = req.params;
+
+        const conversation = await getConversationByIdForUser(conversationId, userId);
+        if (!conversation) return res.status(404).json({ message: 'Чат не найден' });
+
+        const message = await Message.findOne({ _id: messageId, conversationId });
+        if (!message) return res.status(404).json({ message: 'Сообщение не найдено' });
+        if (String(message.senderId) !== userId) {
+            return res.status(403).json({ message: 'Можно удалить только свои сообщения' });
+        }
+
+        await Message.deleteOne({ _id: messageId });
+
+        const last = await Message.findOne({ conversationId }).sort({ createdAt: -1 }).lean();
+        conversation.lastMessageAt = last?.createdAt || null;
+        conversation.lastMessageText = last
+            ? (last.messageType === 'voice' ? 'Голосовое сообщение' : (last.text || ''))
+            : '';
+        await conversation.save();
+
+        const io = getIO();
+        if (io) {
+            io.to(`conversation:${conversationId}`).emit('chat:message_deleted', {
+                conversationId: String(conversationId),
+                messageId: String(messageId)
+            });
+        }
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('deleteMessage error', err);
+        return res.status(500).json({ message: 'Ошибка удаления сообщения' });
+    }
+};
+
+export const deleteChat = async (req, res) => {
+    try {
+        const userId = String(req.user.id);
+        const { conversationId } = req.params;
+
+        const conversation = await getConversationByIdForUser(conversationId, userId);
+        if (!conversation) return res.status(404).json({ message: 'Чат не найден' });
+
+        await Message.deleteMany({ conversationId });
+        await Conversation.deleteOne({ _id: conversationId });
+
+        const io = getIO();
+        if (io) {
+            for (const participant of conversation.participants || []) {
+                io.to(`user:${String(participant)}`).emit('chat:conversation_deleted', {
+                    conversationId: String(conversationId)
+                });
+            }
+        }
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('deleteChat error', err);
+        return res.status(500).json({ message: 'Ошибка удаления чата' });
     }
 };
 

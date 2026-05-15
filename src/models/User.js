@@ -10,6 +10,10 @@ const UserSchema = new mongoose.Schema({
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     avatarUrl: { type: String, default: null },
+    referralCode: { type: String, unique: true, sparse: true, default: null },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    referralsCount: { type: Number, default: 0 },
+    profileAccentColor: { type: String, default: null },
     characterCustomization: {
         gender: { type: String, enum: ['male', 'female'], default: 'male' },
         characterFile: { type: String, default: 'Алмаз.png' },
@@ -46,6 +50,36 @@ const UserSchema = new mongoose.Schema({
 
     rank: { type: String, default: 'Бронза I' },
     achievements: { type: [String], default: [] },
+
+    userAchievements: {
+        type: [{
+            achievementCode: { type: String, required: true },
+            progressCurrent: { type: Number, default: 0 },
+            progressTarget: { type: Number, default: 1 },
+            unlockedAt: { type: Date, default: null },
+            claimedRewards: { type: Boolean, default: false }
+        }],
+        default: []
+    },
+    achievementStats: {
+        releaseTrackedAt: { type: Date, default: Date.now },
+        loginDays: { type: [String], default: [] },
+        lastLoginDayKey: { type: String, default: '' },
+        wordAddDays: { type: [String], default: [] },
+        testPassDays: { type: [String], default: [] },
+        testsPassedCount: { type: Number, default: 0 },
+        hardTestsCount: { type: Number, default: 0 },
+        completedCoursesCount: { type: Number, default: 0 },
+        coursePerfect: { type: Boolean, default: false },
+        courseOneDay: { type: Boolean, default: false },
+        cameBackAfterBreak: { type: Boolean, default: false },
+        profileCompleted: { type: Boolean, default: false },
+        avatarChanged: { type: Boolean, default: false },
+        usedDarkTheme: { type: Boolean, default: false },
+        usedTranslator: { type: Boolean, default: false },
+        firstMessage: { type: Boolean, default: false },
+        firstTts: { type: Boolean, default: false }
+    },
     courseAchievements: {
         type: [{
             courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
