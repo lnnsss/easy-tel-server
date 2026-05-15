@@ -4,8 +4,7 @@ const WordSchema = new mongoose.Schema({
     nameRu: { type: String, required: true, unique: true },
     nameEn: { type: String, required: true },
     nameTatar: { type: String, required: true },
-    externalWordId: { type: String, unique: true, sparse: true },
-    source: { type: String, enum: ['manual', 'external'], default: 'manual' },
+    source: { type: String, enum: ['manual'], default: 'manual' },
     transcription: String,
     descriptionRu: String,
     usageExamples: [{

@@ -1,7 +1,6 @@
 import Word from '../models/Word.js';
 import UserWord from '../models/UserWord.js';
 import User from '../models/User.js';
-import { getExternalWordSource } from '../services/externalWordSource.service.js';
 
 const normalizeSpaces = (value) => String(value || '').replace(/\s+/g, ' ').trim();
 const normalizeKey = (value) => normalizeSpaces(value)
@@ -40,7 +39,6 @@ export const createWord = async (req, res) => {
 export const getWords = async (req, res) => {
     try {
         const { page = 1, limit = 10, search = '' } = req.query; // лимит 10
-        const q = normalizeKey(search);
         let query = {};
 
         if (search && search.trim() !== '') {
@@ -54,46 +52,14 @@ export const getWords = async (req, res) => {
             };
         }
 
-        const mongoWords = await Word.find(query)
-            .sort({ createdAt: -1 })
-            .lean();
-
-        const source = await getExternalWordSource();
-        const importedIdSet = new Set(mongoWords.map((word) => word.externalWordId).filter(Boolean));
-        const importedNameSet = new Set(mongoWords.map((word) => `${normalizeKey(word.nameEn)}::${normalizeKey(word.nameTatar)}`));
-
-        const externalCandidates = (source?.words || [])
-            .filter((word) => {
-                const key = `${normalizeKey(word.nameEn)}::${normalizeKey(word.nameTatar)}`;
-                if (importedIdSet.has(word.id) || importedNameSet.has(key)) return false;
-                if (!q) return true;
-                return [word.nameRu, word.nameEn, word.nameTatar].some((value) => normalizeKey(value).includes(q));
-            })
-            .map((word) => ({
-                _id: word.id,
-                id: word.id,
-                externalWordId: word.id,
-                nameRu: capitalizeFirst(word.nameRu),
-                nameEn: normalizeSpaces(word.nameEn),
-                nameTatar: capitalizeFirst(word.nameTatar),
-                transcription: normalizeSpaces(word.transcription),
-                descriptionRu: normalizeSpaces(word.descriptionRu || word.description),
-                source: 'rodon.org',
-                isExternalCandidate: true
-            }));
-
-        const combined = [
-            ...mongoWords.map((word) => ({
-                ...word,
-                source: word.source || 'manual',
-                isExternalCandidate: false
-            })),
-            ...externalCandidates
-        ];
-        const totalItems = combined.length;
+        const totalItems = await Word.countDocuments(query);
         const totalPages = Math.max(1, Math.ceil(totalItems / Number(limit)));
         const currentPage = Number(page);
-        const words = combined.slice((currentPage - 1) * Number(limit), currentPage * Number(limit));
+        const words = await Word.find(query)
+            .sort({ createdAt: -1 })
+            .skip((currentPage - 1) * Number(limit))
+            .limit(Number(limit))
+            .lean();
 
         res.json({
             words,
@@ -131,113 +97,5 @@ export const deleteWord = async (req, res) => {
         res.json({ message: 'Удалено' });
     } catch (err) {
         res.status(500).json({ message: 'Ошибка удаления' });
-    }
-};
-
-export const importExternalWords = async (req, res) => {
-    try {
-        const wordIds = Array.isArray(req.body?.wordIds) ? req.body.wordIds.map((id) => String(id || '').trim()).filter(Boolean) : [];
-        const overwrite = Boolean(req.body?.overwrite);
-        if (!wordIds.length) {
-            return res.status(400).json({ message: 'Нужно передать wordIds' });
-        }
-
-        const source = await getExternalWordSource();
-        const byId = new Map((source?.words || []).map((word) => [String(word.id), word]));
-
-        const result = {
-            requested: wordIds.length,
-            imported: 0,
-            updated: 0,
-            skipped: 0,
-            missing: []
-        };
-
-        const operations = [];
-        for (const externalId of wordIds) {
-            const externalWord = byId.get(externalId);
-            if (!externalWord) {
-                result.missing.push(externalId);
-                continue;
-            }
-
-            const payload = {
-                nameRu: capitalizeFirst(externalWord.nameRu),
-                nameEn: normalizeSpaces(externalWord.nameEn),
-                nameTatar: capitalizeFirst(externalWord.nameTatar),
-                transcription: normalizeSpaces(externalWord.transcription),
-                descriptionRu: normalizeSpaces(externalWord.descriptionRu || externalWord.description),
-                externalWordId: externalId,
-                source: 'external',
-                isActive: true
-            };
-
-            const existing = await Word.findOne({
-                $or: [
-                    { externalWordId: externalId },
-                    {
-                        nameEn: payload.nameEn,
-                        nameTatar: payload.nameTatar
-                    }
-                ]
-            }).select('_id externalWordId');
-
-            if (!existing) {
-                operations.push({ insertOne: { document: payload } });
-                result.imported += 1;
-                continue;
-            }
-
-            if (!overwrite) {
-                result.skipped += 1;
-                continue;
-            }
-
-            operations.push({
-                updateOne: {
-                    filter: { _id: existing._id },
-                    update: { $set: payload }
-                }
-            });
-            result.updated += 1;
-        }
-
-        if (operations.length > 0) {
-            await Word.bulkWrite(operations, { ordered: false });
-        }
-
-        res.json({
-            message: 'Импорт завершен',
-            ...result
-        });
-    } catch (err) {
-        console.error('importExternalWords error:', err);
-        res.status(500).json({ message: 'Ошибка импорта внешних слов' });
-    }
-};
-
-export const cleanupExternalImportedWords = async (req, res) => {
-    try {
-        const externalWords = await Word.find({
-            $or: [
-                { source: 'external' },
-                { source: 'rodon.org' },
-                { externalWordId: { $exists: true, $ne: null } }
-            ]
-        }).select('_id');
-        const ids = externalWords.map((word) => word._id);
-
-        if (ids.length > 0) {
-            const userWords = await UserWord.find({ word: { $in: ids } }).select('_id');
-            const userWordIds = userWords.map((item) => item._id);
-            await UserWord.deleteMany({ _id: { $in: userWordIds } });
-            await User.updateMany({}, { $pull: { dictionary: { $in: userWordIds } } });
-            await Word.deleteMany({ _id: { $in: ids } });
-        }
-
-        res.json({ message: 'Внешние импортированные слова удалены', deleted: ids.length });
-    } catch (err) {
-        console.error('cleanupExternalImportedWords error:', err);
-        res.status(500).json({ message: 'Ошибка очистки внешних слов' });
     }
 };
