@@ -5,12 +5,14 @@ import TopicQuiz from '../models/TopicQuiz.js';
 import UserCourseProgress from '../models/UserCourseProgress.js';
 import UserTopicAttempt from '../models/UserTopicAttempt.js';
 import User from '../models/User.js';
+import DailyRewardConfig from '../models/DailyRewardConfig.js';
 import { sendCourseReviewDecisionEmail } from '../services/mailer.js';
 import {
     buildContentBlocksForRead,
     buildLegacyContentFromBlocks,
     normalizeTopicBlocks
 } from '../utils/topicContent.js';
+import { normalizeRewardDaysInput } from '../utils/dailyRewards.js';
 
 const parseBoolean = (value, fallback = true) => {
     if (typeof value === 'boolean') return value;
@@ -660,5 +662,42 @@ export const reviewCourse = async (req, res) => {
     } catch (err) {
         console.error('reviewCourse error', err);
         return res.status(500).json({ message: err?.message || 'Ошибка модерации курса' });
+    }
+};
+
+export const getDailyRewardConfigAdmin = async (_req, res) => {
+    try {
+        let config = await DailyRewardConfig.findOne({ key: 'default' });
+        if (!config) {
+            config = await DailyRewardConfig.create({
+                key: 'default',
+                days: normalizeRewardDaysInput([])
+            });
+        }
+
+        return res.json({
+            days: normalizeRewardDaysInput(config.days || [])
+        });
+    } catch (err) {
+        console.error('getDailyRewardConfigAdmin error', err);
+        return res.status(500).json({ message: 'Ошибка загрузки конфигурации наград' });
+    }
+};
+
+export const upsertDailyRewardConfigAdmin = async (req, res) => {
+    try {
+        const days = normalizeRewardDaysInput(req.body?.days || []);
+        const config = await DailyRewardConfig.findOneAndUpdate(
+            { key: 'default' },
+            { $set: { key: 'default', days } },
+            { upsert: true, new: true }
+        );
+
+        return res.json({
+            days: normalizeRewardDaysInput(config.days || [])
+        });
+    } catch (err) {
+        console.error('upsertDailyRewardConfigAdmin error', err);
+        return res.status(500).json({ message: 'Ошибка сохранения конфигурации наград' });
     }
 };

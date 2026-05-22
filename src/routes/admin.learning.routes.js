@@ -18,7 +18,9 @@ import {
     deleteTopic,
     upsertTopicQuiz,
     getTopicQuizAdmin,
-    uploadTopicImage
+    uploadTopicImage,
+    getDailyRewardConfigAdmin,
+    upsertDailyRewardConfigAdmin
 } from '../controllers/admin.learning.controller.js';
 
 const router = Router();
@@ -44,5 +46,7 @@ router.delete('/topics/:id', deleteTopic);
 
 router.get('/topics/:topicId/quiz', getTopicQuizAdmin);
 router.put('/topics/:topicId/quiz', upsertTopicQuiz);
+router.get('/daily-rewards', getDailyRewardConfigAdmin);
+router.put('/daily-rewards', upsertDailyRewardConfigAdmin);
 
 export default router;

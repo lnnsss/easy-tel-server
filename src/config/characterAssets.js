@@ -10,7 +10,7 @@ const STATIC_FREE_ITEMS_WHITELIST = {
     shoes: ['Базовая.png'],
     bottom: ['Базовые.png'],
     top: ['Базовая.png'],
-    headdress: ['Базовый.png'],
+    headdress: ['Базовый.png', 'Базовый.png'],
     background: ['__theme__']
 };
 

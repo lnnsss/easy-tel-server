@@ -91,7 +91,13 @@ const UserSchema = new mongoose.Schema({
 
     streak: { type: Number, default: 0 },
     lastStreakDate: { type: Date, default: null },
-    lastLogin: Date
+    lastLogin: Date,
+    dailyRewards: {
+        nextDay: { type: Number, default: 1, min: 1, max: 8 },
+        lastClaimDateKey: { type: String, default: '' },
+        lastModalShownDateKey: { type: String, default: '' },
+        completedAt: { type: Date, default: null }
+    }
 }, { timestamps: true });
 
 export default mongoose.model('User', UserSchema);

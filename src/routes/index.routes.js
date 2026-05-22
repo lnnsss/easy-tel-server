@@ -14,6 +14,7 @@ import chatsRoutes from './chats.routes.js';
 import translateRoutes from './translate.routes.js';
 import authorRequestsRoutes from './author.requests.routes.js';
 import authorLearningRoutes from './author.learning.routes.js';
+import rewardsRoutes from './rewards.routes.js';
 import { Router } from 'express';
 
 const router = Router();
@@ -34,5 +35,6 @@ router.use('/users', usersRoutes);
 router.use('/friends', friendsRoutes);
 router.use('/chats', chatsRoutes);
 router.use('/translate', translateRoutes);
+router.use('/rewards', rewardsRoutes);
 
 export default router;
