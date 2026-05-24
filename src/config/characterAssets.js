@@ -10,7 +10,7 @@ const STATIC_FREE_ITEMS_WHITELIST = {
     shoes: ['Базовая.png'],
     bottom: ['Базовые.png'],
     top: ['Базовая.png'],
-    headdress: ['Базовый.png', 'Базовый.png'],
+    headdress: [''],
     background: ['__theme__']
 };
 
@@ -59,7 +59,7 @@ export const getCharacterAssetsConfig = () => {
     const shoes = readAssetFolder('shoes');
     const bottom = readAssetFolder('bottom');
     const top = readAssetFolder('top');
-    const headdress = readAssetFolder('headdress');
+    const headdress = ['', ...readAssetFolder('headdress')];
     const backgrounds = ['__theme__', ...readAssetFolder('backgrounds')];
 
     const genderDefaults = {
@@ -74,7 +74,7 @@ export const getCharacterAssetsConfig = () => {
         shoesFile: pickDefault(shoes, freeItemsWhitelist.shoes[0]),
         bottomFile: pickDefault(bottom, freeItemsWhitelist.bottom[0]),
         topFile: pickDefault(top, freeItemsWhitelist.top[0]),
-        headdressFile: pickDefault(headdress, freeItemsWhitelist.headdress[0]),
+        headdressFile: '',
         backgroundFile: backgrounds.includes('__theme__') ? '__theme__' : (backgrounds[0] || '')
     };
 

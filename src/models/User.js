@@ -20,7 +20,7 @@ const UserSchema = new mongoose.Schema({
         shoesFile: { type: String, default: 'Базовая.png' },
         bottomFile: { type: String, default: 'Базовые.png' },
         topFile: { type: String, default: 'Базовая.png' },
-        headdressFile: { type: String, default: 'Базовый.png' },
+        headdressFile: { type: String, default: '' },
         backgroundFile: { type: String, default: '__theme__' },
         updatedAt: { type: Date, default: Date.now }
     },
