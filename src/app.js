@@ -71,6 +71,7 @@ const RATE_LIMIT_GLOBAL_MAX = toInt(process.env.RATE_LIMIT_GLOBAL_MAX, 600);
 const RATE_LIMIT_AUTH_MAX = toInt(process.env.RATE_LIMIT_AUTH_MAX, 40);
 const RATE_LIMIT_SOCIAL_MAX = toInt(process.env.RATE_LIMIT_SOCIAL_MAX, 240);
 const RATE_LIMIT_TRANSLATE_MAX = toInt(process.env.RATE_LIMIT_TRANSLATE_MAX, 180);
+const RATE_LIMIT_AI_CHAT_MAX = toInt(process.env.RATE_LIMIT_AI_CHAT_MAX, 90);
 
 const apiLimiter = createLimiter({
     windowMs: RATE_LIMIT_WINDOW_MS,
@@ -91,6 +92,11 @@ const translateLimiter = createLimiter({
     windowMs: RATE_LIMIT_WINDOW_MS,
     max: RATE_LIMIT_TRANSLATE_MAX,
     scope: 'translate'
+});
+const aiChatLimiter = createLimiter({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    max: RATE_LIMIT_AI_CHAT_MAX,
+    scope: 'ai_chat'
 });
 
 app.use(express.json());
@@ -115,6 +121,7 @@ app.use('/api/auth/reset-password', authLimiter);
 app.use('/api/friends', socialLimiter);
 app.use('/api/chats', socialLimiter);
 app.use('/api/translate', translateLimiter);
+app.use('/api/ai-chat', aiChatLimiter);
 
 app.use('/api', indexRoutes);
 
