@@ -1,6 +1,4 @@
 import express from 'express';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -11,11 +9,6 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 import indexRoutes from './routes/index.routes.js';
-import seedAdmin from './utils/seedAdmin.js';
-import { migrateUserPoints } from './utils/migrateUserPoints.js';
-import { migrateHeaddressDefault } from './utils/migrateHeaddressDefault.js';
-
-dotenv.config();
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -125,16 +118,5 @@ app.use('/api/translate', translateLimiter);
 app.use('/api/ai-chat', aiChatLimiter);
 
 app.use('/api', indexRoutes);
-
-mongoose.connect(process.env.MONGO_URI)
-    .then(async () => {
-        console.log('MongoDB connected');
-        await seedAdmin(); // создаём админа, если нет
-        await migrateUserPoints();
-        await migrateHeaddressDefault();
-    })
-    .catch(err => {
-        console.error('MongoDB error:', err);
-    });
 
 export default app;

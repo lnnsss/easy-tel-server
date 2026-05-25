@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed:users:one-time": "node src/scripts/seedUsersOneTimeTo20.js",
+    "users:randomize-profile-colors": "node src/scripts/randomizeProfileAccentColors.js"
   },
   "keywords": [],
   "author": "",

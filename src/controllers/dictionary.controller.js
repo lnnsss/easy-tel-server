@@ -71,8 +71,9 @@ export const addToDictionary = async (req, res) => {
 
 export const getDictionary = async (req, res) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
-    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 9, 1), 100);
     const skip = (page - 1) * limit;
+    const q = String(req.query.q || '').trim();
 
     const user = await User.findById(req.user.id).select('dictionary scanPoints studyPoints totalPoints rank');
     if (user) {
@@ -80,9 +81,34 @@ export const getDictionary = async (req, res) => {
         await user.save();
     }
 
+    const userWordQuery = { user: req.user.id };
+    if (q) {
+        const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchRegex = new RegExp(escaped, 'i');
+        const matchingWords = await Word.find({
+            isActive: true,
+            $or: [
+                { nameRu: searchRegex },
+                { nameTatar: searchRegex },
+                { nameEn: searchRegex }
+            ]
+        }).select('_id').lean();
+        const wordIds = matchingWords.map((item) => item._id);
+        if (!wordIds.length) {
+            return res.json({
+                items: [],
+                totalItems: 0,
+                totalPages: 1,
+                currentPage: 1,
+                hasMore: false
+            });
+        }
+        userWordQuery.word = { $in: wordIds };
+    }
+
     const [dbTotalItems, words] = await Promise.all([
-        UserWord.countDocuments({ user: req.user.id }),
-        UserWord.find({ user: req.user.id })
+        UserWord.countDocuments(userWordQuery),
+        UserWord.find(userWordQuery)
             .sort({ learnedAt: -1, _id: -1 })
             .skip(skip)
             .limit(limit)

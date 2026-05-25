@@ -5,7 +5,7 @@ import Friendship from '../models/Friendship.js';
 import CompanionRequest from '../models/CompanionRequest.js';
 import { getFriendUserIds, normalizeUserPair } from '../utils/socialGraph.js';
 
-const USER_PUBLIC_SELECT = 'username firstName lastName avatarUrl rank totalPoints dictionary';
+const USER_PUBLIC_SELECT = 'username firstName lastName avatarUrl avatarAccentColor rank totalPoints dictionary';
 const COMPANION_PURPOSE_LABEL = {
     speech_practice: 'Для тренировки татарской речи',
     competition: 'Для соревнования между собой',
@@ -26,6 +26,7 @@ const formatUserCard = (user) => ({
     firstName: user.firstName,
     lastName: user.lastName,
     avatarUrl: user.avatarUrl || null,
+    avatarAccentColor: user.avatarAccentColor || null,
     rank: user.rank,
     totalPoints: Number(user.totalPoints) || 0,
     wordsCount: Array.isArray(user.dictionary) ? user.dictionary.length : 0

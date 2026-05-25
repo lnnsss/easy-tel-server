@@ -16,6 +16,13 @@ const normalizeSortField = (value) => {
 };
 
 const normalizeSortOrder = (value) => (String(value || '').toLowerCase() === 'asc' ? 1 : -1);
+const parseOptionalNumber = (value) => {
+    if (value === undefined || value === null) return null;
+    const normalized = String(value).trim();
+    if (!normalized) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+};
 
 export const getUsers = async (req, res) => {
     try {
@@ -27,8 +34,8 @@ export const getUsers = async (req, res) => {
         const hasCoursesRaw = String(req.query.hasCourses || '').trim().toLowerCase();
         const createdFrom = req.query.registrationDateFrom ? new Date(req.query.registrationDateFrom) : null;
         const createdTo = req.query.registrationDateTo ? new Date(req.query.registrationDateTo) : null;
-        const minPoints = Number.isFinite(Number(req.query.minPoints)) ? Number(req.query.minPoints) : null;
-        const maxPoints = Number.isFinite(Number(req.query.maxPoints)) ? Number(req.query.maxPoints) : null;
+        const minPoints = parseOptionalNumber(req.query.minPoints);
+        const maxPoints = parseOptionalNumber(req.query.maxPoints);
         const sortBy = normalizeSortField(req.query.sortBy);
         const sortOrder = normalizeSortOrder(req.query.sortOrder);
 

@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import { pickRandomAvatarAccentColor } from '../utils/avatarAccentColor.js';
+import { pickRandomProfileAccentColor } from '../utils/profileAccentColor.js';
 
 const UserSchema = new mongoose.Schema({
     email: { type: String, unique: true, required: true },
@@ -10,10 +12,11 @@ const UserSchema = new mongoose.Schema({
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     avatarUrl: { type: String, default: null },
+    avatarAccentColor: { type: String, default: pickRandomAvatarAccentColor },
     referralCode: { type: String, unique: true, sparse: true, default: null },
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     referralsCount: { type: Number, default: 0 },
-    profileAccentColor: { type: String, default: null },
+    profileAccentColor: { type: String, default: pickRandomProfileAccentColor },
     characterCustomization: {
         gender: { type: String, enum: ['male', 'female'], default: 'male' },
         characterFile: { type: String, default: 'Алмаз.png' },

@@ -16,6 +16,7 @@ export const getTopRanking = async (_, res) => {
                     firstName: 1,
                     lastName: 1,
                     avatarUrl: 1,
+                    avatarAccentColor: 1,
                     rank: 1,
                     totalPoints: { $ifNull: ['$totalPoints', 0] },
                     wordsCount: { $size: { $ifNull: ["$dictionary", []] } }
@@ -78,6 +79,7 @@ export const getFriendsRanking = async (req, res) => {
                     firstName: 1,
                     lastName: 1,
                     avatarUrl: 1,
+                    avatarAccentColor: 1,
                     rank: 1,
                     totalPoints: { $ifNull: ['$totalPoints', 0] },
                     wordsCount: { $size: { $ifNull: ['$dictionary', []] } }

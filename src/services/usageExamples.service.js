@@ -5,6 +5,7 @@ const EXAMPLES_LIMIT = 2;
 const CANDIDATES_POOL_SIZE = 18;
 const DEFAULT_AI_MODEL = process.env.USAGE_EXAMPLES_AI_MODEL || "Qwen/Qwen2.5-7B-Instruct";
 const AI_TIMEOUT_MS = Number(process.env.USAGE_EXAMPLES_AI_TIMEOUT_MS || 4500);
+const EXAMPLES_TAT_TIMEOUT_MS = Math.max(Number(process.env.USAGE_EXAMPLES_TAT_TIMEOUT_MS || 8000), 1000);
 const WORD_TOKEN = "EASYTEL_WORD_TOKEN";
 
 const BANNED_CONTEXT_PATTERNS = [
@@ -16,6 +17,20 @@ const BANNED_CONTEXT_PATTERNS = [
     /\bизуч\w*\b/iu,
     /\bграммат\w*\b/iu,
     /\bпример\w*\b/iu
+];
+
+const ANIMAL_WORD_PATTERNS = [
+    /\bсобак\w*\b/iu,
+    /\bпс\w*\b/iu,
+    /\bкот\w*\b/iu,
+    /\bкошк\w*\b/iu,
+    /\bщен\w*\b/iu,
+    /\bкролик\w*\b/iu
+];
+
+const ILLOGICAL_ANIMAL_CONTEXT_PATTERNS = [
+    /\b(купил\w*|купили|покупа\w*).{0,40}\b(к ужину|на ужин|поужинать|съесть)\b/iu,
+    /\b(съел\w*|съели|едим|есть|поел\w*).{0,40}\b(собак\w*|кот\w*|кошк\w*|пс\w*)\b/iu
 ];
 
 let hfClient = null;
@@ -76,6 +91,8 @@ const containsRuWordOrForm = (sentence, wordRu, wordStem) =>
     tokenize(sentence).some((token) => isRelatedRuToken(token, wordRu, wordStem));
 
 const containsBannedContext = (sentence) => BANNED_CONTEXT_PATTERNS.some((re) => re.test(sentence));
+const isAnimalWord = (wordRu) => ANIMAL_WORD_PATTERNS.some((re) => re.test(String(wordRu || "")));
+const hasIllogicalAnimalContext = (sentence) => ILLOGICAL_ANIMAL_CONTEXT_PATTERNS.some((re) => re.test(String(sentence || "")));
 
 const ensureLowercaseWordInsideSentence = (sentence, wordRu, wordStem) => {
     const source = String(sentence || "");
@@ -255,12 +272,12 @@ const buildFallbackCandidates = (wordRuRaw) => {
     const w = getRuCases(wordRuRaw);
     const templates = [
         `Я заметил ${w.acc} во дворе у дома.`,
-        `В магазине мы купили ${w.acc} к ужину.`,
+        `В магазине мы выбрали ${w.acc} и пошли домой.`,
         `На прогулке я сфотографировал ${w.acc}.`,
         `Вечером я показал ${w.acc} друзьям.`,
         `На столе рядом с чашкой лежал ${w.nom}.`,
         `Утром мы искали ${w.acc}, а потом быстро нашли.`,
-        `На рынке сегодня легко найти ${w.acc}.`,
+        `Сегодня в городе легко найти ${w.acc}.`,
         `В объявлении часто упоминают ${w.acc}.`,
         `Я аккуратно положил ${w.acc} в рюкзак.`,
         `По дороге домой мы увидели ${w.acc}.`,
@@ -445,7 +462,7 @@ const buildHardFallbackExamples = (wordRu, wordTat) => {
     const w = getRuCases(wordRu);
     return [
         { textRu: `Я заметил ${w.acc} по дороге домой.`, textTatar: `Өйгә кайтканда мин ${wordTat} күрдем.` },
-        { textRu: `В магазине мы купили ${w.acc}.`, textTatar: `Кибеттә без ${wordTat} сатып алдык.` },
+        { textRu: `В магазине мы нашли ${w.acc}.`, textTatar: `Кибеттә без ${wordTat} таптык.` },
         { textRu: `На фотографии хорошо видно ${w.acc}.`, textTatar: `Бу фотода ${wordTat} яхшы күренә.` },
         { textRu: `Вечером мы говорили о ${w.prep}.`, textTatar: `Кич белән без ${wordTat} турында сөйләштек.` }
     ];
@@ -455,6 +472,7 @@ export const generateUsageExamplesForWord = async ({ wordRu, wordTatar, excludeE
     const cleanWordRu = lowerFirst(normalizeSpaces(wordRu));
     const cleanWordTat = lowerFirst(normalizeSpaces(wordTatar));
     const wordStem = getWordStemRu(cleanWordRu);
+    const isAnimal = isAnimalWord(cleanWordRu);
 
     if (!cleanWordRu || !cleanWordTat) {
         return [];
@@ -466,7 +484,7 @@ export const generateUsageExamplesForWord = async ({ wordRu, wordTatar, excludeE
             .filter(Boolean)
         : [];
 
-    const timeoutMs = getTatsoftTimeoutMs();
+    const timeoutMs = Math.min(getTatsoftTimeoutMs(), EXAMPLES_TAT_TIMEOUT_MS);
     const aiCandidates = await tryGenerateWithAi(cleanWordRu, wordStem);
     const fallbackCandidates = buildFallbackCandidates(cleanWordRu)
         .map((s) => ensureLowercaseWordInsideSentence(s, cleanWordRu, wordStem))
@@ -475,6 +493,7 @@ export const generateUsageExamplesForWord = async ({ wordRu, wordTatar, excludeE
 
     const ruCandidates = dedupeSentences([...aiCandidates, ...fallbackCandidates])
         .filter((s) => !isTooSimilar(s, excludedRu))
+        .filter((s) => !(isAnimal && hasIllogicalAnimalContext(s)))
         .slice(0, CANDIDATES_POOL_SIZE);
 
     const selectedRuSentences = pickMostDiverseExamples(
@@ -514,14 +533,16 @@ export const generateUsageExamplesForWord = async ({ wordRu, wordTatar, excludeE
     }
 
     const normalizedGenerated = normalizeUsageExamples(generated)
-        .filter((item) => !isTooSimilar(item.textRu, excludedRu));
+        .filter((item) => !isTooSimilar(item.textRu, excludedRu))
+        .filter((item) => !(isAnimal && hasIllogicalAnimalContext(item.textRu)));
 
     if (normalizedGenerated.length >= EXAMPLES_LIMIT) {
         return normalizedGenerated.slice(0, EXAMPLES_LIMIT);
     }
 
     const hardFallback = buildHardFallbackExamples(cleanWordRu, cleanWordTat)
-        .filter((item) => !isTooSimilar(item.textRu, [...excludedRu, ...normalizedGenerated.map((x) => x.textRu)]));
+        .filter((item) => !isTooSimilar(item.textRu, [...excludedRu, ...normalizedGenerated.map((x) => x.textRu)]))
+        .filter((item) => !(isAnimal && hasIllogicalAnimalContext(item.textRu)));
 
     return normalizeUsageExamples([...normalizedGenerated, ...hardFallback]);
 };
