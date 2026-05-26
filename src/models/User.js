@@ -48,7 +48,8 @@ const UserSchema = new mongoose.Schema({
         shoes: { type: [String], default: [] },
         bottom: { type: [String], default: [] },
         top: { type: [String], default: [] },
-        headdress: { type: [String], default: [] }
+        headdress: { type: [String], default: [] },
+        background: { type: [String], default: [] }
     },
 
     rank: { type: String, default: 'Бронза I' },

@@ -117,6 +117,14 @@ const buildDefaultOwnedCosmetics = () => {
     return result;
 };
 
+const COSMETIC_FIELD_MAP = {
+    shoes: 'shoesFile',
+    bottom: 'bottomFile',
+    top: 'topFile',
+    headdress: 'headdressFile',
+    background: 'backgroundFile'
+};
+
 export const register = async (req, res) => {
     try {
         const {
@@ -626,6 +634,17 @@ export const updateProfile = async (req, res) => {
                 currentUser.coins = coins - ITEM_PRICE_COINS;
                 owned.add(file);
                 currentUser.ownedCosmetics[category] = [...owned];
+            }
+
+            const field = COSMETIC_FIELD_MAP[category];
+            if (field) {
+                const currentCustomization = currentUser.characterCustomization || defaultCharacterCustomization;
+                updates.characterCustomization = {
+                    ...defaultCharacterCustomization,
+                    ...currentCustomization,
+                    [field]: file,
+                    updatedAt: new Date()
+                };
             }
         }
 
