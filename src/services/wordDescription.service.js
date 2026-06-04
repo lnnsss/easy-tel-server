@@ -1,9 +1,7 @@
-import { HfInference } from "@huggingface/inference";
+import { sendChatToMl } from "./mlChat.service.js";
 
-const DEFAULT_MODEL = process.env.WORD_DESCRIPTION_AI_MODEL || process.env.USAGE_EXAMPLES_AI_MODEL || "Qwen/Qwen2.5-7B-Instruct";
 const AI_TIMEOUT_MS = Number(process.env.WORD_DESCRIPTION_AI_TIMEOUT_MS || 5500);
 
-let hfClient = null;
 const descriptionCache = new Map();
 
 const normalizeSpaces = (value) => String(value || "").replace(/\s+/g, " ").trim();
@@ -13,31 +11,6 @@ const capitalizeFirst = (value) => {
     const clean = normalizeSpaces(value);
     if (!clean) return "";
     return clean.charAt(0).toUpperCase() + clean.slice(1);
-};
-
-const withTimeout = async (promise, timeoutMs) => {
-    let timeoutId = null;
-    const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error("word_description_ai_timeout")), timeoutMs);
-    });
-
-    try {
-        return await Promise.race([promise, timeoutPromise]);
-    } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-    }
-};
-
-const getHfClient = () => {
-    if (!process.env.HUGGINGFACEHUB_API_TOKEN) return null;
-    if (!hfClient) hfClient = new HfInference();
-    return hfClient;
-};
-
-const extractGeneratedText = (response) => {
-    if (typeof response?.generated_text === "string") return response.generated_text;
-    if (Array.isArray(response) && typeof response[0]?.generated_text === "string") return response[0].generated_text;
-    return "";
 };
 
 const cleanDescription = (value) => normalizeSpaces(
@@ -95,27 +68,24 @@ const buildPrompt = ({ wordRu, wordTatar, wordEn }) => {
 };
 
 const generateWithAi = async ({ wordRu, wordTatar, wordEn }) => {
-    const client = getHfClient();
-    if (!client) return "";
-
     try {
-        const response = await withTimeout(
-            client.textGeneration({
-                model: DEFAULT_MODEL,
-                inputs: buildPrompt({ wordRu, wordTatar, wordEn }),
-                parameters: {
-                    max_new_tokens: 420,
-                    temperature: 0.7,
-                    top_p: 0.9,
-                    return_full_text: false
-                }
-            }),
-            AI_TIMEOUT_MS
-        );
+        const response = await sendChatToMl({
+            mode: "tutor",
+            temperature: 0.7,
+            maxNewTokens: 420,
+            timeoutMs: AI_TIMEOUT_MS,
+            messages: [
+                {
+                    role: "system",
+                    content: "Ты пишешь краткие словарные описания на русском языке. Возвращай только итоговый абзац."
+                },
+                { role: "user", content: buildPrompt({ wordRu, wordTatar, wordEn }) }
+            ]
+        });
 
-        return cleanDescription(extractGeneratedText(response));
+        return cleanDescription(response.reply);
     } catch (err) {
-        console.warn("⚠️ AI описание недоступно, используем fallback:", err?.message || err);
+        console.warn("⚠️ Локальное AI описание недоступно, используем fallback:", err?.message || err);
         return "";
     }
 };

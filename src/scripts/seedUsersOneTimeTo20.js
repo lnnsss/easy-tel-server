@@ -373,7 +373,7 @@ const seedUserProgress = async (user, pool) => {
 
     await user.save();
 
-    // Single event recomputes progress map and unlocks/rewards all eligible achievements.
+    // Одно событие пересчитывает карту прогресса и открывает/выдает награды за все подходящие достижения.
     await trackAchievementEvent({ userId: user._id, eventType: 'login' });
 
     const refreshed = await User.findById(user._id).select('scanPoints studyPoints totalPoints rank coins dictionary userAchievements courseAchievements achievementStats');

@@ -23,8 +23,9 @@ const SYSTEM_PROMPTS = {
     translate: [
         'Ты Аиша, переводчик платформы EasyTel (RU↔TT).',
         'Отвечай только на русском, но обязательно давай нужный перевод на татарский или русский по запросу.',
-        'Формат: сначала "Перевод:", затем при необходимости короткая пометка о форме слова.',
-        'Не добавляй лишних рассуждений.'
+        'Если пользователь просит перевести фразу или предложение, переводи всю фразу, а не отдельное слово.',
+        'Если пользователь просит объяснить перевод, после строки "Перевод:" добавь короткое "Пояснение:" на русском.',
+        'Не называй источник перевода и не добавляй лишних рассуждений.'
     ].join(' '),
     correct: [
         'Ты Аиша, редактор татарского языка на платформе EasyTel.',
@@ -42,23 +43,68 @@ const normalizeMode = (value) => {
 const normalizeLookupWord = (value) => String(value || '')
     .trim()
     .toLowerCase()
+    .replace(/ё/g, 'е')
     .replace(/[!?.,;:()"'`«»]/g, '')
     .replace(/\s+/g, ' ');
 
-const extractWordForTranslation = (text) => {
+const stripTranslationHints = (value) => String(value || '')
+    .replace(/\b(?:скажи|пожалуйста|объясни|поясни|и\s+объясни|и\s+поясни)\b/giu, ' ')
+    .replace(/\b(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и)|английск(?:ом|ий|и))\b/giu, ' ')
+    .replace(/\b(?:татарча|русча)\b/giu, ' ')
+    .replace(/\b(?:будет|будут|переводится|переводятся|значит|означает)\b/giu, ' ')
+    .replace(/\b(?:слово|фразу|фраза)\b/giu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const extractTextForTranslation = (text) => {
     const raw = String(text || '').trim();
     if (!raw) return '';
 
-    const quoted = raw.match(/[«"']([^«"']{1,60})[»"']/u)?.[1];
-    if (quoted) return normalizeLookupWord(quoted);
+    const quoted = raw.match(/[«"']([^«"']{1,240})[»"']/u)?.[1];
+    if (quoted) return normalizeLookupWord(stripTranslationHints(quoted));
 
-    const byPattern = raw.match(/(?:перевод|перевести|как\s+будет|что\s+значит)\s+(?:слово\s+)?([^\n?.!,]{1,60})/iu)?.[1];
-    if (byPattern) return normalizeLookupWord(byPattern);
+    const howLanguageWillBe = raw.match(/как\s+(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и))\s+буд(?:ет|ут)\s+(?:слово\s+)?([^\n?!]{1,240})/iu)?.[1];
+    if (howLanguageWillBe) return normalizeLookupWord(stripTranslationHints(howLanguageWillBe));
+
+    const whatLanguageForWord = raw.match(/(?:как|что)\s+(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и))\s+(?:для\s+)?(?:слова\s+)?([^\n?!]{1,240})/iu)?.[1];
+    if (whatLanguageForWord) return normalizeLookupWord(stripTranslationHints(whatLanguageForWord));
+
+    const afterQuestion = raw.match(/(?:перевод|переведи|перевести|как\s+буд(?:ет|ут)|что\s+значит|как\s+сказать|как\s+перевести)\s+(?:слово\s+)?([^\n?!]{1,240})/iu)?.[1];
+    if (afterQuestion) return normalizeLookupWord(stripTranslationHints(afterQuestion));
+
+    const beforeLanguage = raw.match(/^([^\n?!]{1,240}?)\s+(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и))\b/iu)?.[1];
+    if (beforeLanguage) return normalizeLookupWord(stripTranslationHints(beforeLanguage));
+
+    const cleaned = normalizeLookupWord(stripTranslationHints(raw));
+    if (cleaned && !cleaned.includes(' ')) return cleaned;
 
     return '';
 };
+const extractWordForTranslation = extractTextForTranslation;
 
-const isTranslationRequest = (text = '') => /перевод|перевести|как\s+будет|что\s+значит/i.test(String(text));
+const isTranslationRequest = (text = '') => (
+    /перевод|переведи|перевести|как\s+буд(?:ет|ут)|что\s+значит|как\s+сказать|как\s+перевести/i.test(String(text))
+    || /\b(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и))\b/i.test(String(text))
+);
+const isTranslationFlow = ({ mode, text }) => mode === 'translate' || isTranslationRequest(text);
+const wantsTranslationExplanation = (text = '') => /объясни|поясни|почему|разбор|пояснение/i.test(String(text));
+const resolveTatsoftDirection = (text = '', value = '') => {
+    const raw = String(text || '');
+    if (/\b(?:на|по)\s+русск(?:ом|ий|и)\b/i.test(raw) || /что\s+значит/i.test(raw)) return 'tat2rus';
+    if (/\b(?:на|по)\s+татарск(?:ом|ий|и)\b/i.test(raw)) return 'rus2tat';
+    return /[а-яё]/i.test(String(value || '')) ? 'rus2tat' : 'tat2rus';
+};
+const buildUnknownTranslationReply = (lookupWord) => (
+    lookupWord
+        ? `Перевод: к сожалению, я не знаю точный перевод ${isSingleLookupWord(lookupWord) ? 'слова' : 'текста'} «${lookupWord}».`
+        : 'Перевод: к сожалению, я не смогла выделить слово для точного перевода.'
+);
+const isSingleLookupWord = (value) => {
+    const normalized = normalizeLookupWord(value);
+    if (!normalized) return false;
+    const parts = normalized.split(' ').filter(Boolean);
+    return parts.length === 1;
+};
 const LEARNING_RE = /изуч|обуч|учеб|учить|практик|урок|курс|язык|грамматик|слово|фраз|упражнен|диалог|произнош|склонени|спряжени|перевод|перевести/i;
 const RU_RT_TOPIC_RE = /росси|рф\b|москв|казан|татарстан|татарстана|татарстане/i;
 const EXPLICIT_RE = /(?:^|[\s,.;:!?])(порно|секс|эротик|наркот|закладк|суицид|самоубий|убий|террор|бомб|взрывчат|изнасил|педоф|расчлен)(?:[\s,.;:!?]|$)/i;
@@ -79,14 +125,129 @@ const isAllowedTopic = (text = '') => {
 
 const getLatestUserMessage = (messages = []) => [...messages].reverse().find((item) => item.role === 'user');
 
+const capitalizeFirstLetter = (value) => String(value || '').replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase('ru-RU'));
+
+export const formatTranslationReply = ({ sourceText, translatedText, direction, explanation = '' }) => {
+    const directionText = direction === 'tat2rus' ? 'по-русски' : 'по-татарски';
+    const lines = [`Перевод: «${capitalizeFirstLetter(sourceText)}» ${directionText} — «${translatedText}».`];
+    if (explanation) lines.push(explanation);
+    return lines.join('\n');
+};
+
+const TRANSLATION_GLOSSARY = [
+    { ru: 'мы', tt: 'без', ruMeaning: 'мы' },
+    { ru: 'мама', tt: 'әни', ruMeaning: 'мама' },
+    { ru: 'я', tt: 'мин', ruMeaning: 'я' },
+    { ru: 'тебя', tt: 'сине', ruMeaning: 'тебя' },
+    { ru: 'ты', tt: 'син', ruMeaning: 'ты' },
+    { ru: 'люблю', tt: 'яратам', ruMeaning: 'люблю' },
+    { ru: 'любить', tt: 'ярату', ruMeaning: 'любить' },
+    { ru: 'с друзьями', tt: 'дуслар белән', ruMeaning: 'с друзьями' },
+    { ru: 'друзьями', tt: 'дуслар', ruMeaning: 'друзья' },
+    { ru: 'на речку', tt: 'елга буена', ruMeaning: 'на речку / к берегу реки' },
+    { ru: 'речку', tt: 'елга буена', ruMeaning: 'на речку / к берегу реки' },
+    { ru: 'поехали', tt: 'киттек', ruMeaning: 'поехали / отправились' },
+    { ru: 'папа', tt: 'әти', ruMeaning: 'папа' },
+    { ru: 'спасибо', tt: 'рәхмәт', ruMeaning: 'спасибо' },
+    { ru: 'здравствуйте', tt: 'исәнмесез', ruMeaning: 'здравствуйте' },
+    { ru: 'привет', tt: 'сәлам', ruMeaning: 'привет' }
+];
+
+const normalizeExplanationToken = (value) => normalizeLookupWord(value).replace(/[^\p{L}\p{N}\s]/gu, '');
+
+const includesNormalizedPhrase = (text, phrase) => {
+    const normalizedText = ` ${normalizeExplanationToken(text)} `;
+    const normalizedPhrase = normalizeExplanationToken(phrase);
+    return normalizedPhrase ? normalizedText.includes(` ${normalizedPhrase} `) : false;
+};
+
+const findOriginalTranslationToken = (translation, token) => {
+    const escaped = String(token || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return String(translation || '').match(new RegExp(escaped, 'iu'))?.[0] || token;
+};
+
+const removeOverlappingGlossaryEntries = (entries) => {
+    const selected = [];
+    const bySpecificity = [...entries].sort((left, right) => {
+        const ttDiff = normalizeExplanationToken(right.tt).length - normalizeExplanationToken(left.tt).length;
+        if (ttDiff) return ttDiff;
+        return normalizeExplanationToken(right.ru).length - normalizeExplanationToken(left.ru).length;
+    });
+
+    bySpecificity.forEach((entry) => {
+        const entryTt = normalizeExplanationToken(entry.tt);
+        const entryRu = normalizeExplanationToken(entry.ru);
+        const isCovered = selected.some((selectedEntry) => {
+            const selectedTt = normalizeExplanationToken(selectedEntry.tt);
+            const selectedRu = normalizeExplanationToken(selectedEntry.ru);
+            return selectedTt === entryTt
+                || includesNormalizedPhrase(selectedTt, entryTt)
+                || selectedRu === entryRu
+                || includesNormalizedPhrase(selectedRu, entryRu);
+        });
+        if (!isCovered) selected.push(entry);
+    });
+
+    return selected;
+};
+
+const buildGrammarNotes = (translation) => {
+    const normalized = normalizeExplanationToken(translation);
+    const notes = [];
+
+    if (includesNormalizedPhrase(normalized, 'белән')) {
+        notes.push('«белән» ставится после слова и работает как русское «с»: «дуслар белән» буквально «друзья с»');
+    }
+    if (includesNormalizedPhrase(normalized, 'елга буена')) {
+        notes.push('«елга буена» передает направление к реке или к берегу реки, поэтому по смыслу подходит для русского «на речку»');
+    }
+    if (includesNormalizedPhrase(normalized, 'киттек')) {
+        notes.push('«киттек» — форма прошедшего времени от «китү» в значении «мы пошли/поехали/отправились»');
+    }
+    if (/\s+\S*(?:дык|дек|тык|тек)\s*$/iu.test(` ${normalized} `)) {
+        notes.push('В татарском сказуемое часто стоит в конце фразы, поэтому действие закрывает предложение');
+    }
+
+    return notes;
+};
+
+const buildDeterministicTranslationExplanation = ({ sourceText, translatedText, direction }) => {
+    const source = String(sourceText || '').trim();
+    const translation = String(translatedText || '').trim();
+    if (!source || !translation) return '';
+
+    const matchedEntries = removeOverlappingGlossaryEntries(TRANSLATION_GLOSSARY
+        .filter(({ ru, tt }) => {
+        if (direction === 'tat2rus') {
+            return includesNormalizedPhrase(source, tt) && includesNormalizedPhrase(translation, ru);
+        }
+        return includesNormalizedPhrase(source, ru) && includesNormalizedPhrase(translation, tt);
+    }))
+        .sort((left, right) => translation.toLowerCase().indexOf(left.tt) - translation.toLowerCase().indexOf(right.tt));
+
+    if (matchedEntries.length) {
+        const parts = matchedEntries.map(({ tt, ruMeaning }) => `«${findOriginalTranslationToken(translation, tt)}» — «${ruMeaning}»`);
+        const notes = buildGrammarNotes(translation);
+        const lines = [
+            'Разбор перевода:',
+            ...parts.map((part, index) => `${part}${index === parts.length - 1 ? '.' : ','}`),
+            ...notes.map((note) => `${note}.`)
+        ];
+        return lines.join('\n');
+    }
+
+    const targetLanguageText = direction === 'tat2rus' ? 'русский' : 'татарский';
+    return `Смысл фразы «${source}» передан готовым вариантом «${translation}» на ${targetLanguageText}. Я не вижу в локальной базе подробного разбора каждого слова, поэтому безопасно поясняю общий смысл, не подменяя перевод другими формами.`;
+};
+
 const tryBuildDbTranslationReply = async ({ mode, messages }) => {
     const lastUserMessage = getLatestUserMessage(messages);
     const userText = String(lastUserMessage?.content || '').trim();
     if (!userText) return null;
-    if (mode !== 'translate' && !isTranslationRequest(userText)) return null;
+    if (!isTranslationFlow({ mode, text: userText })) return null;
 
     const lookupWord = extractWordForTranslation(userText);
-    if (!lookupWord || lookupWord.includes(' ')) return null;
+    if (!isSingleLookupWord(lookupWord)) return null;
 
     const escaped = lookupWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const exactCi = new RegExp(`^${escaped}$`, 'i');
@@ -107,45 +268,37 @@ const tryBuildDbTranslationReply = async ({ mode, messages }) => {
     const en = String(word.nameEn || '').trim();
 
     if (exactCi.test(ru)) {
-        return `Перевод: «${ru}» по-татарски — «${tt}».\nИсточник: словарь EasyTel`;
+        return { sourceText: ru, translatedText: tt, direction: 'rus2tat', provider: 'local_dictionary' };
     }
     if (exactCi.test(tt)) {
-        return `Перевод: «${tt}» по-русски — «${ru}».\nИсточник: словарь EasyTel`;
+        return { sourceText: tt, translatedText: ru, direction: 'tat2rus', provider: 'local_dictionary' };
     }
-    return `Перевод: «${en}» по-русски — «${ru}», по-татарски — «${tt}».\nИсточник: словарь EasyTel`;
+    return { sourceText: en, translatedText: `${ru}; ${tt}`, direction: 'rus2tat', provider: 'local_dictionary' };
 };
 
 const tryBuildTatsoftTranslationReply = async ({ mode, messages }) => {
     const lastUserMessage = getLatestUserMessage(messages);
     const userText = String(lastUserMessage?.content || '').trim();
     if (!userText) return null;
-    if (mode !== 'translate' && !isTranslationRequest(userText)) return null;
+    if (!isTranslationFlow({ mode, text: userText })) return null;
 
     const lookupWord = extractWordForTranslation(userText);
-    if (!lookupWord || lookupWord.includes(' ')) return null;
+    if (!lookupWord) return null;
 
     const timeoutMs = getTatsoftTimeoutMs();
-    const ruToTat = await translateWithTatsoft({
-        direction: 'ru-tt',
+    const direction = resolveTatsoftDirection(userText, lookupWord);
+    const result = await translateWithTatsoft({
+        direction,
         text: lookupWord,
         timeoutMs
     }).catch(() => null);
-    const ttToRu = await translateWithTatsoft({
-        direction: 'tt-ru',
-        text: lookupWord,
-        timeoutMs
-    }).catch(() => null);
+    const translatedText = String(result?.translation || '').trim();
+    return translatedText ? { sourceText: lookupWord, translatedText, direction, provider: 'tatsoft' } : null;
+};
 
-    const ruToTatText = String(ruToTat?.translation || '').trim();
-    const ttToRuText = String(ttToRu?.translation || '').trim();
-
-    if (ruToTatText) {
-        return `Перевод: «${lookupWord}» по-татарски — «${ruToTatText}».\nИсточник: Tatsoft`;
-    }
-    if (ttToRuText) {
-        return `Перевод: «${lookupWord}» по-русски — «${ttToRuText}».\nИсточник: Tatsoft`;
-    }
-    return `Перевод: к сожалению, я не знаю точный перевод слова «${lookupWord}».`;
+export const buildTranslationExplanation = ({ sourceText, translatedText, direction, userText }) => {
+    if (!wantsTranslationExplanation(userText)) return '';
+    return buildDeterministicTranslationExplanation({ sourceText, translatedText, direction });
 };
 
 const sanitizeMessages = (raw) => {
@@ -180,6 +333,7 @@ export const sendAiChatMessage = async (req, res) => {
 
         const lastUserMessage = getLatestUserMessage(messages);
         const userText = String(lastUserMessage?.content || '').trim();
+        const shouldHandleAsTranslation = isTranslationFlow({ mode, text: userText });
         if (mode === 'tutor' && userText && !isAllowedTopic(userText)) {
             return res.json({
                 reply: OFFTOP_REDIRECT,
@@ -190,18 +344,35 @@ export const sendAiChatMessage = async (req, res) => {
 
         const dbTranslationReply = await tryBuildDbTranslationReply({ mode, messages });
         if (dbTranslationReply) {
+            const explanation = await buildTranslationExplanation({
+                ...dbTranslationReply,
+                userText
+            });
             return res.json({
-                reply: dbTranslationReply,
-                model: 'local_dictionary',
+                reply: formatTranslationReply({ ...dbTranslationReply, explanation }),
+                model: dbTranslationReply.provider,
                 timingMs: 0
             });
         }
 
         const tatsoftTranslationReply = await tryBuildTatsoftTranslationReply({ mode, messages });
         if (tatsoftTranslationReply) {
+            const explanation = await buildTranslationExplanation({
+                ...tatsoftTranslationReply,
+                userText
+            });
             return res.json({
-                reply: tatsoftTranslationReply,
-                model: 'tatsoft',
+                reply: formatTranslationReply({ ...tatsoftTranslationReply, explanation }),
+                model: tatsoftTranslationReply.provider,
+                timingMs: 0
+            });
+        }
+
+        const lookupWord = extractWordForTranslation(userText);
+        if (shouldHandleAsTranslation) {
+            return res.json({
+                reply: buildUnknownTranslationReply(lookupWord),
+                model: 'translation_fallback',
                 timingMs: 0
             });
         }

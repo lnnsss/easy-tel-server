@@ -45,19 +45,19 @@ const getOrCreateProgress = async (userId, courseId, topicIds = []) => {
         progress.unlockedTopicIds = (progress.unlockedTopicIds || []).filter((id) => topicIdSet.has(String(id)));
         progress.completedTopicIds = (progress.completedTopicIds || []).filter((id) => topicIdSet.has(String(id)));
 
-        // If progress was created before topics existed, unlock the first topic now.
+        // Если прогресс создали раньше появления тем, открываем первую тему сейчас.
         if (topicIds.length > 0 && progress.unlockedTopicIds.length === 0) {
             progress.unlockedTopicIds = [topicIds[0]];
         }
 
-        // Keep next uncompleted topic unlocked (important when new topics were added after completion).
+        // Держим следующую незавершенную тему открытой — это важно, если новые темы добавили после завершения.
         const completedSet = new Set((progress.completedTopicIds || []).map((id) => String(id)));
         const firstUncompleted = topicIds.find((id) => !completedSet.has(String(id)));
         if (firstUncompleted && !progress.unlockedTopicIds.some((id) => String(id) === String(firstUncompleted))) {
             progress.unlockedTopicIds.push(firstUncompleted);
         }
 
-        // If new topics were added after the course had been completed, reopen the course.
+        // Если новые темы добавили после завершения курса, снова открываем курс.
         if (progress.completedAt && progress.completedTopicIds.length < topicIds.length) {
             progress.completedAt = null;
         }

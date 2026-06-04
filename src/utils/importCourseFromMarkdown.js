@@ -283,7 +283,7 @@ run().catch(async (error) => {
     try {
         await mongoose.disconnect();
     } catch {
-        // ignore disconnect errors
+        // Игнорируем ошибки отключения.
     }
     process.exit(1);
 });

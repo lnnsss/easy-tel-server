@@ -28,10 +28,10 @@ export const sendChatToMl = async ({
     messages,
     mode = 'tutor',
     temperature = 0.6,
-    maxNewTokens = 240
+    maxNewTokens = 240,
+    timeoutMs = getMlChatTimeoutMs()
 }) => {
     const url = String(process.env.ML_CHAT_URL || DEFAULT_ML_CHAT_URL).trim();
-    const timeoutMs = getMlChatTimeoutMs();
     const startedAt = Date.now();
 
     const response = await withTimeout(

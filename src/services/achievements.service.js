@@ -230,7 +230,7 @@ export const trackAchievementEvent = async ({ userId, eventType, payload = {} })
         stats.profileCompleted = true;
     }
     if (eventType === 'referral_invited') {
-        // Progress is computed from user.referralsCount in calculateProgressMap.
+        // Прогресс вычисляется по количеству рефералов пользователя.
     }
     if (eventType === 'avatar_changed') stats.avatarChanged = true;
     if (eventType === 'theme_dark_used') stats.usedDarkTheme = true;

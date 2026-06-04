@@ -9,6 +9,7 @@
     "test:invalid-direction": "node src/tests/test-invalid-direction.js",
     "test:empty-text": "node src/tests/test-empty-text.js",
     "test:impossible": "node src/tests/test-impossible-scenario.js",
+    "test:ai-chat-translation-explanation": "node src/tests/test-ai-chat-translation-explanation.js",
     "seed:users:one-time": "node src/scripts/seedUsersOneTimeTo20.js",
     "users:randomize-profile-colors": "node src/scripts/randomizeProfileAccentColors.js"
   },
@@ -17,7 +18,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@huggingface/inference": "^4.13.11",
     "axios": "^1.13.4",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

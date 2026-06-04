@@ -1,9 +1,8 @@
-import { HfInference } from "@huggingface/inference";
 import { getTatsoftTimeoutMs, translateWithTatsoft } from "./tatsoft.service.js";
+import { sendChatToMl } from "./mlChat.service.js";
 
 const EXAMPLES_LIMIT = 2;
 const CANDIDATES_POOL_SIZE = 18;
-const DEFAULT_AI_MODEL = process.env.USAGE_EXAMPLES_AI_MODEL || "Qwen/Qwen2.5-7B-Instruct";
 const AI_TIMEOUT_MS = Number(process.env.USAGE_EXAMPLES_AI_TIMEOUT_MS || 4500);
 const EXAMPLES_TAT_TIMEOUT_MS = Math.max(Number(process.env.USAGE_EXAMPLES_TAT_TIMEOUT_MS || 8000), 1000);
 const WORD_TOKEN = "EASYTEL_WORD_TOKEN";
@@ -32,8 +31,6 @@ const ILLOGICAL_ANIMAL_CONTEXT_PATTERNS = [
     /\b(купил\w*|купили|покупа\w*).{0,40}\b(к ужину|на ужин|поужинать|съесть)\b/iu,
     /\b(съел\w*|съели|едим|есть|поел\w*).{0,40}\b(собак\w*|кот\w*|кошк\w*|пс\w*)\b/iu
 ];
-
-let hfClient = null;
 
 const normalizeSpaces = (value) => String(value || "").replace(/\s+/g, " ").trim();
 
@@ -301,37 +298,6 @@ const buildFallbackCandidates = (wordRuRaw) => {
     return templates.map((s) => normalizeSentence(s));
 };
 
-const getHfClient = () => {
-    if (!process.env.HUGGINGFACEHUB_API_TOKEN) {
-        return null;
-    }
-
-    if (!hfClient) {
-        hfClient = new HfInference();
-    }
-
-    return hfClient;
-};
-
-const withTimeout = async (promise, timeoutMs) => {
-    let timeoutId = null;
-    const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error("usage_examples_ai_timeout")), timeoutMs);
-    });
-
-    try {
-        return await Promise.race([promise, timeoutPromise]);
-    } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-    }
-};
-
-const extractGeneratedText = (response) => {
-    if (typeof response?.generated_text === "string") return response.generated_text;
-    if (Array.isArray(response) && typeof response[0]?.generated_text === "string") return response[0].generated_text;
-    return "";
-};
-
 const parseAiCandidates = (rawText, wordRu, wordStem) => {
     const lines = String(rawText || "")
         .split(/\n+/)
@@ -345,11 +311,6 @@ const parseAiCandidates = (rawText, wordRu, wordStem) => {
 };
 
 const tryGenerateWithAi = async (wordRu, wordStem) => {
-    const client = getHfClient();
-    if (!client) {
-        return [];
-    }
-
     const prompt = [
         `Сгенерируй 20 коротких естественных предложений на русском языке со словом \"${wordRu}\".`,
         "Используй корректные формы слова по смыслу: падеж и число, где нужно.",
@@ -359,23 +320,23 @@ const tryGenerateWithAi = async (wordRu, wordStem) => {
     ].join(" ");
 
     try {
-        const response = await withTimeout(
-            client.textGeneration({
-                model: DEFAULT_AI_MODEL,
-                inputs: prompt,
-                parameters: {
-                    max_new_tokens: 360,
-                    temperature: 0.95,
-                    top_p: 0.95,
-                    return_full_text: false
-                }
-            }),
-            AI_TIMEOUT_MS
-        );
+        const response = await sendChatToMl({
+            mode: "tutor",
+            temperature: 0.9,
+            maxNewTokens: 360,
+            timeoutMs: AI_TIMEOUT_MS,
+            messages: [
+                {
+                    role: "system",
+                    content: "Ты генерируешь учебные примеры. Отвечай только списком предложений, без пояснений."
+                },
+                { role: "user", content: prompt }
+            ]
+        });
 
-        return parseAiCandidates(extractGeneratedText(response), wordRu, wordStem);
+        return parseAiCandidates(response.reply, wordRu, wordStem);
     } catch (err) {
-        console.warn("⚠️ AI генерация примеров недоступна, используем fallback:", err?.message || err);
+        console.warn("⚠️ Локальная AI генерация примеров недоступна, используем fallback:", err?.message || err);
         return [];
     }
 };

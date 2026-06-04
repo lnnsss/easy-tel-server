@@ -61,7 +61,7 @@ export const recognizeImage = async (req, res) => {
 
         const allWords = await Word.find({ isActive: true });
 
-        // Формируем form-data
+        // Формируем данные формы.
         const formData = new FormData();
         formData.append("file", req.file.buffer, {
             filename: req.file.originalname,
@@ -87,7 +87,7 @@ export const recognizeImage = async (req, res) => {
             });
         }
 
-        // Словарь нормализации прямо в Node.js
+        // Словарь нормализации прямо в серверной среде.
         const LABEL_MAP = {
             "tabby": "Cat",
             "tabby cat": "Cat",
@@ -129,7 +129,7 @@ export const recognizeImage = async (req, res) => {
             "bookshelf": "Bookshelf"
         };
 
-        // Нормализуем labels
+        // Нормализуем метки.
         const labelsFromML = mlResult
             .map((r) => LABEL_MAP[r.label] || r.label)
             .filter(Boolean);

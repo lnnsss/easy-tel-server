@@ -96,7 +96,7 @@ const aiChatLimiter = createLimiter({
 app.use(express.json());
 
 app.use(cors({
-    origin: '*', // TODO для dev, позже ограничу
+    origin: '*', // Заметка для разработки: позже ограничу.
 }));
 
 app.use(helmet({
