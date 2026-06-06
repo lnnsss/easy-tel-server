@@ -8,6 +8,7 @@ import {
     normalizeTopicBlocks
 } from '../utils/topicContent.js';
 
+// Обрабатывает серверный сценарий parseBoolean.
 const parseBoolean = (value, fallback = true) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
@@ -18,6 +19,7 @@ const parseBoolean = (value, fallback = true) => {
     return fallback;
 };
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeCategoryIds = (rawCategoryIds, rawCategoryId) => {
     const source = [];
 
@@ -42,6 +44,7 @@ const normalizeCategoryIds = (rawCategoryIds, rawCategoryId) => {
 };
 const SENTENCE_ALLOWED_RE = /^[\p{L}\p{N}\s-]+$/u;
 
+// Проверяет входные данные и возвращает нормализованный результат.
 const validateAndNormalizeQuestions = (questions = []) => {
     if (!Array.isArray(questions) || questions.length === 0) {
         throw new Error('Добавьте хотя бы один вопрос');
@@ -84,11 +87,13 @@ const validateAndNormalizeQuestions = (questions = []) => {
     });
 };
 
+// Возвращает нужные данные или вычисленное значение.
 const getOwnedCourse = async (userId, courseId) => Course.findOne({
     _id: courseId,
     ownerUserId: userId
 });
 
+// Проверяет наличие нужного состояния или признака.
 const hasChangesSinceReview = async (course) => {
     const reviewedAt = course?.reviewedAt ? new Date(course.reviewedAt) : null;
     if (!reviewedAt) return true;
@@ -109,6 +114,7 @@ const hasChangesSinceReview = async (course) => {
     return Boolean(latestQuiz?.updatedAt && new Date(latestQuiz.updatedAt) > reviewedAt);
 };
 
+// Проверяет, разрешено ли выполнить действие.
 const canSubmitForReview = async (course) => {
     if (!course || course.reviewStatus === 'pending_review') return false;
     const topicsCount = await CourseTopic.countDocuments({ courseId: course._id });
@@ -119,10 +125,12 @@ const canSubmitForReview = async (course) => {
     return true;
 };
 
+// Обрабатывает серверный сценарий touchCourse.
 const touchCourse = async (courseId) => {
     await Course.updateOne({ _id: courseId }, { $set: { updatedAt: new Date() } });
 };
 
+// Гарантирует наличие нужного состояния перед дальнейшей работой.
 const ensureEditableCourse = (course) => {
     if (!course) return { ok: false, code: 404, message: 'Курс не найден' };
     if (course.reviewStatus === 'pending_review') {
@@ -135,6 +143,7 @@ const ensureEditableCourse = (course) => {
     return { ok: true };
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildTopicReadPayload = (topicDoc) => {
     const topic = topicDoc?.toObject ? topicDoc.toObject() : topicDoc;
     return {
@@ -143,12 +152,14 @@ const buildTopicReadPayload = (topicDoc) => {
     };
 };
 
+// Проверяет условие и возвращает логический результат.
 const isTopicContentValidationError = (message = '') => {
     return message.includes('contentBlocks')
         || message.includes('Добавьте хотя бы один блок контента')
         || message.includes('Блок #');
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCategoriesForAuthor = async (_req, res) => {
     try {
         const categories = await CourseCategory.find({ isActive: true }).sort({ order: 1, createdAt: 1 });
@@ -159,6 +170,7 @@ export const getCategoriesForAuthor = async (_req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getAuthorCourses = async (req, res) => {
     try {
         const courses = await Course.find({ ownerUserId: req.user.id })
@@ -178,6 +190,7 @@ export const getAuthorCourses = async (req, res) => {
     }
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createAuthorCourse = async (req, res) => {
     try {
         const {
@@ -226,6 +239,7 @@ export const createAuthorCourse = async (req, res) => {
     }
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateAuthorCourse = async (req, res) => {
     try {
         const course = await getOwnedCourse(req.user.id, req.params.id);
@@ -268,6 +282,7 @@ export const updateAuthorCourse = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteAuthorCourse = async (req, res) => {
     try {
         const course = await getOwnedCourse(req.user.id, req.params.id);
@@ -290,6 +305,7 @@ export const deleteAuthorCourse = async (req, res) => {
     }
 };
 
+// Принимает отправленные пользователем данные и фиксирует результат.
 export const submitAuthorCourseForReview = async (req, res) => {
     try {
         const course = await getOwnedCourse(req.user.id, req.params.id);
@@ -320,10 +336,12 @@ export const submitAuthorCourseForReview = async (req, res) => {
     }
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createCourseRevision = async (req, res) => {
     return res.status(400).json({ message: 'Ревизии отключены. Редактируйте существующий курс и отправляйте его на модерацию.' });
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getAuthorTopics = async (req, res) => {
     try {
         const courseId = String(req.query.courseId || '');
@@ -339,6 +357,7 @@ export const getAuthorTopics = async (req, res) => {
     }
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createAuthorTopic = async (req, res) => {
     try {
         const { courseId, title, content, contentBlocks, order = 0, status = 'draft' } = req.body;
@@ -384,6 +403,7 @@ export const createAuthorTopic = async (req, res) => {
     }
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateAuthorTopic = async (req, res) => {
     try {
         const topic = await CourseTopic.findById(req.params.id);
@@ -417,6 +437,7 @@ export const updateAuthorTopic = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteAuthorTopic = async (req, res) => {
     try {
         const topic = await CourseTopic.findById(req.params.id);
@@ -436,6 +457,7 @@ export const deleteAuthorTopic = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getAuthorTopicQuiz = async (req, res) => {
     try {
         const topic = await CourseTopic.findById(req.params.topicId);
@@ -451,6 +473,7 @@ export const getAuthorTopicQuiz = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий upsertAuthorTopicQuiz.
 export const upsertAuthorTopicQuiz = async (req, res) => {
     try {
         const topicId = req.params.topicId || req.body.topicId;
@@ -482,6 +505,7 @@ export const upsertAuthorTopicQuiz = async (req, res) => {
     }
 };
 
+// Принимает загруженный файл и возвращает информацию для дальнейшей работы.
 export const uploadAuthorTopicImage = async (req, res) => {
     try {
         const courseId = String(req.body.courseId || '');

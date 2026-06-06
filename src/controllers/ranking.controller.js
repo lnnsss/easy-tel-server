@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { ensureLegacyPoints } from '../utils/userProgress.js';
 import { getFriendUserIds } from '../utils/socialGraph.js';
 
+// Возвращает нужные данные или вычисленное значение.
 export const getTopRanking = async (_, res) => {
     try {
         const users = await User.aggregate([
@@ -33,6 +34,7 @@ export const getTopRanking = async (_, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getUserRank = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -46,6 +48,7 @@ export const getUserRank = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getFriendsRanking = async (req, res) => {
     try {
         if (req.user?.role === 'admin') {

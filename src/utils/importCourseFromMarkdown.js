@@ -12,6 +12,7 @@ dotenv.config();
 
 const DEFAULT_MARKDOWN_PATH = path.resolve(process.cwd(), '../other/tatar_language_a1_course.md');
 
+// Содержит вспомогательную логику splitByHeading для переиспользования в проекте.
 const splitByHeading = (source, headingPattern) => {
     const regex = new RegExp(`^${headingPattern}.*$`, 'gm');
     const matches = [...source.matchAll(regex)];
@@ -24,6 +25,7 @@ const splitByHeading = (source, headingPattern) => {
     });
 };
 
+// Достает нужное значение из сырого ввода или ответа сервиса.
 const extractBlock = (source, fromHeading, toHeadingList = []) => {
     const fromRegex = new RegExp(`^${fromHeading}\\s*$`, 'm');
     const fromMatch = source.match(fromRegex);
@@ -44,8 +46,10 @@ const extractBlock = (source, fromHeading, toHeadingList = []) => {
     return rest.slice(0, blockEnd).trim();
 };
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeOptionText = (text) => text.replace(/\s+\(правильный\)\s*$/iu, '').trim();
 
+// Содержит вспомогательную логику parseQuizQuestion для переиспользования в проекте.
 const parseQuizQuestion = (questionBlock) => {
     const typeMatch = questionBlock.match(/^\s*Тип:\s*(.+)\s*$/m);
     const questionMatch = questionBlock.match(/^\s*Вопрос:\s*(.+)\s*$/m);
@@ -110,6 +114,7 @@ const parseQuizQuestion = (questionBlock) => {
     throw new Error(`Неизвестный тип вопроса "${rawType}" в вопросе "${title}"`);
 };
 
+// Содержит вспомогательную логику parseTopicBlocks для переиспользования в проекте.
 const parseTopicBlocks = (topicText) => {
     const lines = String(topicText || '').split('\n');
     const blocks = [];
@@ -144,6 +149,7 @@ const parseTopicBlocks = (topicText) => {
     return blocks;
 };
 
+// Содержит вспомогательную логику parseCourseFromMarkdown для переиспользования в проекте.
 const parseCourseFromMarkdown = (source) => {
     const titleMatch = source.match(/^#\s+(.+)\s*$/m);
     if (!titleMatch) throw new Error('Не найден заголовок курса');
@@ -198,6 +204,7 @@ const parseCourseFromMarkdown = (source) => {
     };
 };
 
+// Определяет итоговое значение на основе входных данных.
 const resolveCategories = async (categoryNames) => {
     const ids = [];
 
@@ -219,6 +226,7 @@ const resolveCategories = async (categoryNames) => {
     return ids;
 };
 
+// Содержит вспомогательную логику run для переиспользования в проекте.
 const run = async () => {
     const markdownPathArg = process.argv[2];
     const markdownPath = markdownPathArg

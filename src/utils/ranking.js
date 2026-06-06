@@ -8,9 +8,11 @@ const RANK_THRESHOLDS = [
     { maxPoints: Infinity, rank: 'Легенда' }
 ];
 
+// Определяет ранг пользователя по количеству очков.
 export const getRank = (points = 0) => {
     const safePoints = Number.isFinite(points) ? points : 0;
     return RANK_THRESHOLDS.find((tier) => safePoints <= tier.maxPoints)?.rank || 'Легенда';
 };
 
+// Возвращает пороги рангов для отображения прогресса.
 export const getRankThresholds = () => RANK_THRESHOLDS;

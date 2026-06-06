@@ -18,6 +18,7 @@ const storage = multer.diskStorage({
     }
 });
 
+// Проверяет запрос в middleware-сценарии imageOnlyFilter.
 const imageOnlyFilter = (_, file, cb) => {
     if (file.mimetype?.startsWith('image/')) {
         return cb(null, true);
@@ -31,6 +32,7 @@ const topicImageUpload = multer({
     fileFilter: imageOnlyFilter
 });
 
+// Проверяет запрос в middleware-сценарии topicImageUploadSingle.
 export const topicImageUploadSingle = (fieldName = 'image') => (req, res, next) => {
     topicImageUpload.single(fieldName)(req, res, (err) => {
         if (!err) return next();

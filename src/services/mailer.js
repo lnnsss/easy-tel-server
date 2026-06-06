@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 
 let transporter = null;
 
+// Загружает данные сервиса и возвращает их вызывающему коду.
 const getTransporter = () => {
     if (transporter) return transporter;
 
@@ -21,6 +22,7 @@ const getTransporter = () => {
     return transporter;
 };
 
+// Отправляет HTML-письмо через настроенный SMTP-транспорт.
 const sendMail = async ({ to, subject, html }) => {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.SMTP_FROM) {
         throw new Error('SMTP variables are not configured');
@@ -34,6 +36,7 @@ const sendMail = async ({ to, subject, html }) => {
     });
 };
 
+// Отправляет письмо с кодом подтверждения email.
 export const sendVerificationCodeEmail = async ({ to, code }) => {
     await sendMail({
         to,
@@ -49,6 +52,7 @@ export const sendVerificationCodeEmail = async ({ to, code }) => {
     });
 };
 
+// Отправляет письмо со ссылкой для сброса пароля.
 export const sendPasswordResetEmail = async ({ to, resetLink }) => {
     await sendMail({
         to,

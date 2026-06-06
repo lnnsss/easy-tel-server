@@ -10,11 +10,13 @@ const DEFAULT_TTS_TIMEOUT_MS = 60000;
 const DEFAULT_TTS_TOKEN = '4b6e6a31-3cc4-45c9-abf3-a68f0ff73df9';
 const insecureHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 
+// Проверяет условие и возвращает логический результат.
 const isTlsCertificateError = (err) => {
     const text = String(err?.message || '').toLowerCase();
     return text.includes('certificate') || text.includes('ssl') || text.includes('tls');
 };
 
+// Загружает данные из внешнего источника или API.
 const fetchJsonWithOptionalInsecure = async ({ url, options, allowInsecureTls }) => {
     try {
         return await fetch(url, options);
@@ -30,6 +32,7 @@ const fetchJsonWithOptionalInsecure = async ({ url, options, allowInsecureTls })
     }
 };
 
+// Обрабатывает серверный сценарий callTatsoftTts.
 const callTatsoftTts = async ({ text, speaker, timeoutMs }) => {
     const base = String(process.env.TATSOFT_TTS_API_BASE || DEFAULT_TTS_BASE).replace(/\/+$/, '');
     const token = String(process.env.TATSOFT_TTS_TOKEN || DEFAULT_TTS_TOKEN).trim();
@@ -76,6 +79,7 @@ const callTatsoftTts = async ({ text, speaker, timeoutMs }) => {
     }
 };
 
+// Обрабатывает запрос на перевод текста через внешний сервис TatSoft.
 export const translateText = async (req, res) => {
     try {
         const direction = String(req.body?.direction || '').trim();
@@ -115,6 +119,7 @@ export const translateText = async (req, res) => {
     }
 };
 
+// Генерирует озвучку татарского текста через сервис TTS.
 export const synthesizeSpeech = async (req, res) => {
     try {
         const text = String(req.body?.text || '').trim();

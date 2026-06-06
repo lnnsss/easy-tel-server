@@ -1,12 +1,15 @@
 const ALLOWED_TOPIC_BLOCK_TYPES = new Set(['h2', 'h3', 'text', 'image', 'spacer']);
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeString = (value) => String(value || '').trim();
+// Приводит входные данные к единому безопасному формату.
 const normalizeImageWidthPercent = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return 50;
     return Math.max(10, Math.min(100, Math.round(numeric)));
 };
 
+// Приводит входные данные к единому безопасному формату.
 export const normalizeTopicBlocks = (rawBlocks = []) => {
     if (!Array.isArray(rawBlocks)) {
         throw new Error('contentBlocks должен быть массивом');
@@ -47,6 +50,7 @@ export const normalizeTopicBlocks = (rawBlocks = []) => {
     });
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 export const buildLegacyContentFromBlocks = (blocks = []) => {
     if (!Array.isArray(blocks) || blocks.length === 0) return '';
 
@@ -57,6 +61,7 @@ export const buildLegacyContentFromBlocks = (blocks = []) => {
         .join('\n\n');
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 export const buildContentBlocksForRead = (topic) => {
     const existing = Array.isArray(topic?.contentBlocks) ? topic.contentBlocks : [];
     if (existing.length > 0) {

@@ -5,6 +5,7 @@ const input = { direction: 'rus2tat', text: '\n\t   \t\n' };
 const expectedStatus = 400;
 const expectedMessage = 'Исходный текст обязателен';
 
+// Запускает сценарий проверки из командной строки.
 const run = async () => {
     printHeader('TEST 2: empty source text should return 400');
     const res = await callTranslate(input);

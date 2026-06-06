@@ -12,8 +12,11 @@ import { buildContentBlocksForRead } from '../utils/topicContent.js';
 
 const TOPIC_POINTS = 3;
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
+// Приводит входные данные к единому безопасному формату.
 const normalizeWordOrderText = (value) => normalizeText(value).split(/\s+/).filter(Boolean).join(' ');
+// Возвращает нужные данные или вычисленное значение.
 const getCourseCategoryIds = (course) => {
     const fromArray = Array.isArray(course?.categoryIds) ? course.categoryIds : [];
     const normalizedArray = fromArray
@@ -28,6 +31,7 @@ const getCourseCategoryIds = (course) => {
     return fallback ? [fallback] : [];
 };
 
+// Возвращает нужные данные или вычисленное значение.
 const getOrCreateProgress = async (userId, courseId, topicIds = []) => {
     let progress = await UserCourseProgress.findOne({ userId, courseId });
     if (!progress) {
@@ -67,10 +71,12 @@ const getOrCreateProgress = async (userId, courseId, topicIds = []) => {
     return progress;
 };
 
+// Возвращает нужные данные или вычисленное значение.
 const getTopicList = async (courseId) => CourseTopic
     .find({ courseId, status: 'published' })
     .sort({ order: 1, createdAt: 1 });
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildQuestionPublicPayload = (question) => {
     if (question.type === 'single_choice') {
         return {
@@ -100,6 +106,7 @@ const buildQuestionPublicPayload = (question) => {
     };
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCourses = async (req, res) => {
     try {
         const [categories, courses, progresses, topicCounts] = await Promise.all([
@@ -156,6 +163,7 @@ export const getCourses = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCourseById = async (req, res) => {
     try {
         const course = await Course.findOne({
@@ -201,6 +209,7 @@ export const getCourseById = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getPinnedCourse = async (_req, res) => {
     try {
         const course = await Course.findOne({
@@ -227,6 +236,7 @@ export const getPinnedCourse = async (_req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCourseTopicById = async (req, res) => {
     try {
         const { id: courseId, topicId } = req.params;
@@ -270,6 +280,7 @@ export const getCourseTopicById = async (req, res) => {
     }
 };
 
+// Принимает отправленные пользователем данные и фиксирует результат.
 export const submitTopicQuiz = async (req, res) => {
     try {
         const { id: courseId, topicId } = req.params;
@@ -448,6 +459,7 @@ export const submitTopicQuiz = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCoursesProgress = async (req, res) => {
     try {
         const progress = await UserCourseProgress.find({ userId: req.user.id })
@@ -470,6 +482,7 @@ export const getCoursesProgress = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCoursesAnalytics = async (req, res) => {
     try {
         const analytics = await getUserCourseAnalytics(req.user.id);

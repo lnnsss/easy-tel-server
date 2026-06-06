@@ -11,6 +11,7 @@ const REQUIRED_WORDS = 20;
 const TEST_SIZE = 20;
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
+// Обрабатывает серверный сценарий pad2.
 const pad2 = (n) => String(n).padStart(2, '0');
 const getIsoWeekPartsUtc = (date = new Date()) => {
     const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -25,6 +26,7 @@ const getWeekKeyUtc = (date = new Date()) => {
     const { year, week } = getIsoWeekPartsUtc(date);
     return `${year}-W${pad2(week)}`;
 };
+// Обрабатывает серверный сценарий shuffle.
 const shuffle = (arr = []) => {
     const next = [...arr];
     for (let i = next.length - 1; i > 0; i -= 1) {
@@ -33,12 +35,14 @@ const shuffle = (arr = []) => {
     }
     return next;
 };
+// Возвращает нужные данные или вычисленное значение.
 const getLevelByScore = (correct) => {
     if (correct >= 18) return 'B2';
     if (correct >= 12) return 'B1';
     return 'A1';
 };
 
+// Добавляет новую запись в пользовательские данные.
 export const addToDictionary = async (req, res) => {
     const wordId = String(req.body?.wordId || '').trim();
     if (!wordId) {
@@ -69,6 +73,7 @@ export const addToDictionary = async (req, res) => {
     });
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getDictionary = async (req, res) => {
     const page = Math.max(Number(req.query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(req.query.limit) || 9, 1), 100);
@@ -129,6 +134,7 @@ export const getDictionary = async (req, res) => {
     });
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getDictionaryItem = async (req, res) => {
     const item = await UserWord.findOne({
         _id: req.params.id,
@@ -142,6 +148,7 @@ export const getDictionaryItem = async (req, res) => {
     res.json(normalizeUserWordForResponse(item));
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getWeeklyAssessmentStatus = async (req, res) => {
     const userId = req.user.id;
     const wordsCount = await UserWord.countDocuments({ user: userId });
@@ -164,6 +171,7 @@ export const getWeeklyAssessmentStatus = async (req, res) => {
     });
 };
 
+// Запускает пользовательский сценарий и подготавливает данные для него.
 export const startWeeklyAssessment = async (req, res) => {
     const userId = req.user.id;
     const weekKey = getWeekKeyUtc(new Date());
@@ -235,6 +243,7 @@ export const startWeeklyAssessment = async (req, res) => {
     });
 };
 
+// Принимает отправленные пользователем данные и фиксирует результат.
 export const submitWeeklyAssessment = async (req, res) => {
     const userId = req.user.id;
     const weekKey = getWeekKeyUtc(new Date());

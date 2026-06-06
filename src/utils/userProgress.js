@@ -2,6 +2,7 @@ import { getRank } from './ranking.js';
 
 export const WORD_SCAN_POINTS = 1;
 
+// Гарантирует наличие нужного состояния перед дальнейшей работой.
 export const ensureLegacyPoints = (user) => {
     if (!user) return user;
 
@@ -21,6 +22,7 @@ export const ensureLegacyPoints = (user) => {
     return user;
 };
 
+// Добавляет новую запись в пользовательские данные.
 export const addScanPoints = (user, points = WORD_SCAN_POINTS) => {
     ensureLegacyPoints(user);
     user.scanPoints += points;
@@ -29,6 +31,7 @@ export const addScanPoints = (user, points = WORD_SCAN_POINTS) => {
     return user;
 };
 
+// Добавляет новую запись в пользовательские данные.
 export const addStudyPoints = (user, points = 0) => {
     ensureLegacyPoints(user);
     user.studyPoints += points;
@@ -37,12 +40,14 @@ export const addStudyPoints = (user, points = 0) => {
     return user;
 };
 
+// Содержит вспомогательную логику toDateKey для переиспользования в проекте.
 export const toDateKey = (dateValue) => {
     const date = new Date(dateValue);
     if (Number.isNaN(date.getTime())) return null;
     return date.toISOString().slice(0, 10);
 };
 
+// Содержит вспомогательную логику calculateDailyStreak для переиспользования в проекте.
 export const calculateDailyStreak = (dateKeys = []) => {
     if (!Array.isArray(dateKeys) || dateKeys.length === 0) return 0;
 

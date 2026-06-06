@@ -1,3 +1,4 @@
+// Содержит вспомогательную логику checkAchievements для переиспользования в проекте.
 export const checkAchievements = (count) => {
     const achievements = [];
 

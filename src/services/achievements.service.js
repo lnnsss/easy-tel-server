@@ -18,12 +18,14 @@ const toDayKey = (dateValue = new Date()) => {
     return d.toISOString().slice(0, 10);
 };
 
+// Считает расстояние между календарными днями для streak-логики.
 const daysBetween = (a, b) => {
     const da = new Date(`${a}T00:00:00.000Z`).getTime();
     const db = new Date(`${b}T00:00:00.000Z`).getTime();
     return Math.round((da - db) / (24 * 60 * 60 * 1000));
 };
 
+// Вычисляет текущую серию активности по набору дневных ключей.
 const streakFromKeys = (keys = []) => {
     const uniq = [...new Set((keys || []).filter(Boolean))].sort().reverse();
     if (!uniq.length) return 0;
@@ -81,6 +83,7 @@ export const ACHIEVEMENT_DEFS = [
     { code: 'referrals_10', title: 'Пригласил 10 друзей', description: 'Пригласите 10 друзей по ссылке', type: 'counter', target: 10, difficulty: 'hard' }
 ].map((def) => ({ ...def, rewards: REWARD_BY_DIFFICULTY[def.difficulty] }));
 
+// Гарантирует наличие структуры статистики достижений у пользователя.
 const ensureStats = (user) => {
     if (!user.achievementStats || typeof user.achievementStats !== 'object') user.achievementStats = {};
     const s = user.achievementStats;
@@ -95,11 +98,13 @@ const ensureStats = (user) => {
     return s;
 };
 
+// Добавляет дневной ключ в историю активности без дублей.
 const upsertDay = (arr, key) => {
     if (!key) return;
     if (!arr.includes(key)) arr.push(key);
 };
 
+// Собирает прогресс пользователя по всем достижениям.
 const calculateProgressMap = async (user) => {
     const stats = ensureStats(user);
 
@@ -195,6 +200,7 @@ const calculateProgressMap = async (user) => {
     return progress;
 };
 
+// Пересчитывает достижения пользователя после учебного события.
 export const trackAchievementEvent = async ({ userId, eventType, payload = {} }) => {
     const user = await User.findById(userId);
     if (!user) return { unlockedNow: [], achievements: [] };
@@ -285,6 +291,7 @@ export const trackAchievementEvent = async ({ userId, eventType, payload = {} })
     };
 };
 
+// Готовит список достижений пользователя для клиентского интерфейса.
 export const buildAchievementsResponse = (user) => {
     const map = new Map((user.userAchievements || []).map((item) => [item.achievementCode, item]));
     return ACHIEVEMENT_DEFS.map((def) => {
@@ -307,6 +314,7 @@ export const buildAchievementsResponse = (user) => {
     });
 };
 
+// Загружает пользователя и возвращает его достижения в клиентском формате.
 export const getAchievementsForUser = async (userId) => {
     const user = await User.findById(userId);
     if (!user) return [];

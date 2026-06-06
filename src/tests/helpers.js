@@ -1,5 +1,6 @@
 import { synthesizeSpeech, translateText } from '../controllers/translate.controller.js';
 
+// Создает mock-объект response для тестов контроллеров.
 export const makeRes = () => ({
     statusCode: 200,
     payload: null,
@@ -13,6 +14,7 @@ export const makeRes = () => ({
     }
 });
 
+// Вызывает translate-контроллер в тестовом окружении.
 export const callTranslate = async (body) => {
     const req = { body, user: null };
     const res = makeRes();
@@ -20,6 +22,7 @@ export const callTranslate = async (body) => {
     return res;
 };
 
+// Вызывает TTS-контроллер в тестовом окружении.
 export const callTts = async (body) => {
     const req = { body, user: null };
     const res = makeRes();
@@ -27,12 +30,14 @@ export const callTts = async (body) => {
     return res;
 };
 
+// Печатает заголовок тестового сценария в консоль.
 export const printHeader = (title) => {
     console.log('='.repeat(72));
     console.log(title);
     console.log('='.repeat(72));
 };
 
+// Печатает результат отдельного тестового сценария.
 export const printScenario = ({ input, expectedStatus, expectedMessage, actualStatus, actualPayload }) => {
     console.log('Input:');
     console.log(JSON.stringify(input, null, 2));

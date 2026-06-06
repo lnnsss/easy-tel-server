@@ -14,12 +14,14 @@ const COMPANION_PURPOSE_LABEL = {
     other: 'Другое'
 };
 
+// Форматирует данные для отображения пользователю.
 const formatCompanionLabel = (purpose, customPurpose = '') => (
     purpose === 'other'
         ? (customPurpose || COMPANION_PURPOSE_LABEL.other)
         : (COMPANION_PURPOSE_LABEL[purpose] || COMPANION_PURPOSE_LABEL.other)
 );
 
+// Форматирует данные для отображения пользователю.
 const formatUserCard = (user) => ({
     _id: user._id,
     username: user.username,
@@ -32,17 +34,20 @@ const formatUserCard = (user) => ({
     wordsCount: Array.isArray(user.dictionary) ? user.dictionary.length : 0
 });
 
+// Обрабатывает серверный сценарий toObjectId.
 const toObjectId = (value) => {
     if (!mongoose.Types.ObjectId.isValid(value)) return null;
     return new mongoose.Types.ObjectId(value);
 };
 
+// Возвращает нужные данные или вычисленное значение.
 const getPagination = (query = {}, defaultLimit = 20, maxLimit = 50) => {
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || defaultLimit, 1), maxLimit);
     return { page, limit, skip: (page - 1) * limit };
 };
 
+// Возвращает нужные данные или вычисленное значение.
 const getPendingRequestMaps = async (currentUserId, candidateIds) => {
     if (!candidateIds.length) {
         return { outgoingMap: new Map(), incomingMap: new Map() };
@@ -67,6 +72,7 @@ const getPendingRequestMaps = async (currentUserId, candidateIds) => {
     return { outgoingMap, incomingMap };
 };
 
+// Обрабатывает серверный сценарий searchUsers.
 export const searchUsers = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -139,6 +145,7 @@ export const searchUsers = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getFriendsList = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -175,6 +182,7 @@ export const getFriendsList = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getIncomingRequests = async (req, res) => {
     try {
         const { page, limit, skip } = getPagination(req.query, 10, 50);
@@ -211,6 +219,7 @@ export const getIncomingRequests = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getOutgoingRequests = async (req, res) => {
     try {
         const { page, limit, skip } = getPagination(req.query, 10, 50);
@@ -247,6 +256,7 @@ export const getOutgoingRequests = async (req, res) => {
     }
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createFriendRequest = async (req, res) => {
     try {
         const fromUserId = String(req.user.id);
@@ -312,6 +322,7 @@ export const createFriendRequest = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий acceptFriendRequest.
 export const acceptFriendRequest = async (req, res) => {
     try {
         const request = await FriendRequest.findOne({
@@ -342,6 +353,7 @@ export const acceptFriendRequest = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий declineFriendRequest.
 export const declineFriendRequest = async (req, res) => {
     try {
         const request = await FriendRequest.findOne({
@@ -365,6 +377,7 @@ export const declineFriendRequest = async (req, res) => {
     }
 };
 
+// Проверяет, разрешено ли выполнить действие.
 export const cancelFriendRequest = async (req, res) => {
     try {
         const request = await FriendRequest.findOne({
@@ -388,6 +401,7 @@ export const cancelFriendRequest = async (req, res) => {
     }
 };
 
+// Удаляет связь или сущность по запросу пользователя.
 export const removeFriend = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -411,6 +425,7 @@ export const removeFriend = async (req, res) => {
     }
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createOrUpdateCompanionRequest = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -451,6 +466,7 @@ export const createOrUpdateCompanionRequest = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCompanionRequests = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -533,6 +549,7 @@ export const getCompanionRequests = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий withdrawCompanionRequest.
 export const withdrawCompanionRequest = async (req, res) => {
     try {
         const userId = String(req.user.id);

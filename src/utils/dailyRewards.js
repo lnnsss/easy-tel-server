@@ -4,12 +4,14 @@ import { toDateKey } from './userProgress.js';
 export const DAILY_REWARD_DAYS = 7;
 const CONFIG_KEY = 'default';
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildDefaultDays = () => Array.from({ length: DAILY_REWARD_DAYS }, (_, index) => ({
     dayNumber: index + 1,
     coins: 0,
     studyPoints: 0
 }));
 
+// Нормализует настройки ежедневных наград для семидневного цикла.
 export const normalizeRewardDaysInput = (rawDays = []) => {
     const inputByDay = new Map();
     if (Array.isArray(rawDays)) {
@@ -34,6 +36,7 @@ export const normalizeRewardDaysInput = (rawDays = []) => {
     });
 };
 
+// Загружает или создает конфигурацию ежедневных наград.
 export const getOrCreateDailyRewardConfig = async () => {
     let config = await DailyRewardConfig.findOne({ key: CONFIG_KEY });
     if (!config) {
@@ -63,6 +66,7 @@ export const getOrCreateDailyRewardConfig = async () => {
     return config;
 };
 
+// Гарантирует наличие структуры ежедневных наград в профиле пользователя.
 export const ensureUserDailyRewardsState = (user) => {
     if (!user.dailyRewards || typeof user.dailyRewards !== 'object') {
         user.dailyRewards = {};

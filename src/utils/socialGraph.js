@@ -3,8 +3,10 @@ import Friendship from '../models/Friendship.js';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
 
+// Содержит вспомогательную логику toIdString для переиспользования в проекте.
 const toIdString = (value) => String(value || '');
 
+// Приводит пару пользователей к стабильному порядку для социальных связей.
 export const normalizeUserPair = (first, second) => {
     const a = toIdString(first);
     const b = toIdString(second);
@@ -12,11 +14,13 @@ export const normalizeUserPair = (first, second) => {
     return a < b ? { a, b } : { a: b, b: a };
 };
 
+// Содержит вспомогательную логику toObjectId для переиспользования в проекте.
 export const toObjectId = (value) => {
     if (!value || !mongoose.Types.ObjectId.isValid(value)) return null;
     return new mongoose.Types.ObjectId(value);
 };
 
+// Возвращает id друзей пользователя из подтвержденных связей.
 export const getFriendUserIds = async (userId) => {
     const uid = toIdString(userId);
     if (!uid) return [];
@@ -32,6 +36,7 @@ export const getFriendUserIds = async (userId) => {
     });
 };
 
+// Содержит вспомогательную логику areUsersFriends для переиспользования в проекте.
 export const areUsersFriends = async (firstUserId, secondUserId) => {
     const pair = normalizeUserPair(firstUserId, secondUserId);
     if (!pair.a || !pair.b) return false;
@@ -40,6 +45,7 @@ export const areUsersFriends = async (firstUserId, secondUserId) => {
     return Boolean(exists);
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getOrCreateDirectConversation = async (firstUserId, secondUserId) => {
     const pair = normalizeUserPair(firstUserId, secondUserId);
     if (!pair.a || !pair.b) return null;
@@ -56,6 +62,7 @@ export const getOrCreateDirectConversation = async (firstUserId, secondUserId) =
     return conversation;
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getConversationPartnerId = (conversation, currentUserId) => {
     const me = toIdString(currentUserId);
     const participantA = toIdString(conversation.participantA || conversation.participants?.[0]);
@@ -65,6 +72,7 @@ export const getConversationPartnerId = (conversation, currentUserId) => {
     return participantA;
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getConversationUnreadCountForUser = async (conversationId, userId) => {
     return Message.countDocuments({
         conversationId,
@@ -73,6 +81,7 @@ export const getConversationUnreadCountForUser = async (conversationId, userId) 
     });
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getTotalUnreadCountForUser = async (userId) => {
     const conversations = await Conversation.find({ participants: userId }).select('_id').lean();
     if (!conversations.length) return 0;

@@ -2,11 +2,13 @@ import { getAchievementsForUser, trackAchievementEvent } from '../services/achie
 
 const ALLOWED_EVENTS = new Set(['theme_dark_used']);
 
+// Возвращает нужные данные или вычисленное значение.
 export const getAchievements = async (req, res) => {
     const achievements = await getAchievementsForUser(req.user.id);
     res.json({ items: achievements });
 };
 
+// Обрабатывает серверный сценарий postAchievementEvent.
 export const postAchievementEvent = async (req, res) => {
     const eventType = String(req.body?.eventType || '').trim();
     if (!ALLOWED_EVENTS.has(eventType)) {

@@ -13,6 +13,7 @@ import { trackAchievementEvent } from '../services/achievements.service.js';
 
 let ioInstance = null;
 
+// Отправляет пользователю обновленные счетчики непрочитанных сообщений.
 const emitUnread = async (userId, conversationId) => {
     if (!ioInstance) return;
     const [conversationUnread, totalUnread] = await Promise.all([
@@ -27,6 +28,7 @@ const emitUnread = async (userId, conversationId) => {
     });
 };
 
+// Проверяет JWT перед подключением пользователя к socket.io.
 const authenticateSocket = async (socket, next) => {
     try {
         const tokenFromAuth = socket.handshake?.auth?.token;
@@ -49,6 +51,7 @@ const authenticateSocket = async (socket, next) => {
     }
 };
 
+// Обрабатывает пользовательское или системное событие.
 const handleSendMessage = (socket) => async (payload = {}) => {
     try {
         const conversationId = String(payload.conversationId || '');
@@ -123,6 +126,7 @@ const handleSendMessage = (socket) => async (payload = {}) => {
     }
 };
 
+// Обрабатывает пользовательское или системное событие.
 const handleReadMessage = (socket) => async (payload = {}) => {
     try {
         const conversationId = String(payload.conversationId || '');
@@ -164,6 +168,7 @@ const handleReadMessage = (socket) => async (payload = {}) => {
     }
 };
 
+// Подключает Socket.IO к HTTP-серверу и регистрирует события чатов.
 export const initSocket = (httpServer) => {
     ioInstance = new Server(httpServer, {
         cors: {
@@ -194,4 +199,5 @@ export const initSocket = (httpServer) => {
     return ioInstance;
 };
 
+// Возвращает активный экземпляр Socket.IO для серверных уведомлений.
 export const getIO = () => ioInstance;

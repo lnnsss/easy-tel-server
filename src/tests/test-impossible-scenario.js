@@ -5,6 +5,7 @@ const input = { text: 'Сәлам', speaker: 'robot' };
 const expectedStatus = 200;
 const expectedMessage = 'Озвучка должна пройти даже с несуществующим голосом';
 
+// Запускает сценарий проверки из командной строки.
 const run = async () => {
     printHeader('TEST 3 (INTENTIONAL FAIL): accept unsupported TTS speaker');
     const res = await callTts(input);

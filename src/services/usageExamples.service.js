@@ -32,30 +32,37 @@ const ILLOGICAL_ANIMAL_CONTEXT_PATTERNS = [
     /\b(съел\w*|съели|едим|есть|поел\w*).{0,40}\b(собак\w*|кот\w*|кошк\w*|пс\w*)\b/iu
 ];
 
+// Нормализует пробелы, чтобы дальнейшие проверки работали стабильно.
 const normalizeSpaces = (value) => String(value || "").replace(/\s+/g, " ").trim();
 
+// Очищает предложение от служебных префиксов и лишних пробелов.
 const normalizeSentence = (value) => normalizeSpaces(String(value || "").replace(/^[\d)\].\-:;\s]+/, ""));
 
+// Делает первую букву строчной для естественной подстановки слова.
 const lowerFirst = (value) => {
     const text = String(value || "");
     if (!text) return "";
     return text[0].toLowerCase() + text.slice(1);
 };
 
+// Экранирует строку для безопасной сборки регулярного выражения.
 const escapeRegExp = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// Разбивает текст на нормализованные токены для сравнения похожести.
 const tokenize = (value) => String(value || "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s-]/gu, " ")
     .split(/\s+/)
     .filter(Boolean);
 
+// Приводит текст к форме, удобной для поиска дублей и совпадений.
 const normalizeForCompare = (value) => String(value || "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 
+// Загружает данные сервиса и возвращает их вызывающему коду.
 const getWordStemRu = (wordRu) => {
     const word = normalizeForCompare(wordRu);
     if (!word) return "";
@@ -71,6 +78,7 @@ const getWordStemRu = (wordRu) => {
     return word;
 };
 
+// Проверяет, относится ли русский токен к нужному слову или его основе.
 const isRelatedRuToken = (token, wordRu, wordStem) => {
     const cleanToken = normalizeForCompare(token);
     const cleanWord = normalizeForCompare(wordRu);
@@ -84,13 +92,18 @@ const isRelatedRuToken = (token, wordRu, wordStem) => {
     return cleanToken.startsWith(wordStem);
 };
 
+// Проверяет, есть ли в предложении слово или близкая форма слова.
 const containsRuWordOrForm = (sentence, wordRu, wordStem) =>
     tokenize(sentence).some((token) => isRelatedRuToken(token, wordRu, wordStem));
 
+// Отсекает предложения с контекстом, неподходящим для примеров.
 const containsBannedContext = (sentence) => BANNED_CONTEXT_PATTERNS.some((re) => re.test(sentence));
+// Определяет слова про животных для дополнительных смысловых ограничений.
 const isAnimalWord = (wordRu) => ANIMAL_WORD_PATTERNS.some((re) => re.test(String(wordRu || "")));
+// Находит неестественный контекст для примеров со словами о животных.
 const hasIllogicalAnimalContext = (sentence) => ILLOGICAL_ANIMAL_CONTEXT_PATTERNS.some((re) => re.test(String(sentence || "")));
 
+// Приводит найденное слово внутри предложения к нижнему регистру.
 const ensureLowercaseWordInsideSentence = (sentence, wordRu, wordStem) => {
     const source = String(sentence || "");
     const matches = [...source.matchAll(/[\p{L}\p{N}-]+/gu)];
@@ -117,6 +130,7 @@ const ensureLowercaseWordInsideSentence = (sentence, wordRu, wordStem) => {
     return normalizeSentence(result);
 };
 
+// Заменяет первое подходящее русское слово временным токеном.
 const replaceFirstRelatedRuWordWithToken = (sentence, wordRu, wordStem) => {
     const source = String(sentence || "");
     const matches = [...source.matchAll(/[\p{L}\p{N}-]+/gu)];
@@ -135,6 +149,7 @@ const replaceFirstRelatedRuWordWithToken = (sentence, wordRu, wordStem) => {
     return source;
 };
 
+// Считает похожесть предложений по пересечению токенов.
 const jaccardSimilarity = (left, right) => {
     const a = new Set(tokenize(left));
     const b = new Set(tokenize(right));
@@ -149,6 +164,7 @@ const jaccardSimilarity = (left, right) => {
     return union ? intersection / union : 1;
 };
 
+// Определяет, слишком ли предложение похоже на уже выбранные примеры.
 const isTooSimilar = (sentence, excludedSentences) => {
     for (const excluded of excludedSentences) {
         if (normalizeForCompare(sentence) === normalizeForCompare(excluded)) {
@@ -161,6 +177,7 @@ const isTooSimilar = (sentence, excludedSentences) => {
     return false;
 };
 
+// Удаляет повторяющиеся и почти одинаковые предложения.
 const dedupeSentences = (sentences) => {
     const seen = new Set();
     const result = [];
@@ -179,6 +196,7 @@ const dedupeSentences = (sentences) => {
     return result;
 };
 
+// Выбирает разнообразные примеры из списка кандидатов.
 const pickMostDiverseExamples = (sentences, count = EXAMPLES_LIMIT) => {
     const clean = dedupeSentences(sentences);
     if (clean.length <= count) {
@@ -215,6 +233,7 @@ const pickMostDiverseExamples = (sentences, count = EXAMPLES_LIMIT) => {
     return bestPair.slice(0, count);
 };
 
+// Загружает данные сервиса и возвращает их вызывающему коду.
 const getRuCases = (wordRuRaw) => {
     const word = lowerFirst(normalizeSpaces(wordRuRaw));
     if (!word) {
@@ -265,6 +284,7 @@ const getRuCases = (wordRuRaw) => {
     };
 };
 
+// Создает резервные русские предложения, если ИИ не дал хорошие варианты.
 const buildFallbackCandidates = (wordRuRaw) => {
     const w = getRuCases(wordRuRaw);
     const templates = [
@@ -298,6 +318,7 @@ const buildFallbackCandidates = (wordRuRaw) => {
     return templates.map((s) => normalizeSentence(s));
 };
 
+// Разбирает ответ ИИ в список подходящих предложений-кандидатов.
 const parseAiCandidates = (rawText, wordRu, wordStem) => {
     const lines = String(rawText || "")
         .split(/\n+/)
@@ -310,6 +331,7 @@ const parseAiCandidates = (rawText, wordRu, wordStem) => {
         .filter((line) => !containsBannedContext(line));
 };
 
+// Пробует получить примеры употребления через AI-сервис.
 const tryGenerateWithAi = async (wordRu, wordStem) => {
     const prompt = [
         `Сгенерируй 20 коротких естественных предложений на русском языке со словом \"${wordRu}\".`,
@@ -341,9 +363,11 @@ const tryGenerateWithAi = async (wordRu, wordStem) => {
     }
 };
 
+// Возвращает слово на место временного токена в предложении.
 const replaceTokenWithWord = (sentence, word) => String(sentence || "")
     .replace(new RegExp(escapeRegExp(WORD_TOKEN), "g"), word);
 
+// Следит, чтобы татарский пример содержал нужное слово.
 const ensureWordInTatarSentence = ({ sentenceTat, wordTat, translatedWordCandidate }) => {
     const cleanSentenceTat = normalizeSentence(sentenceTat);
     const canonicalWord = normalizeSpaces(wordTat);
@@ -370,6 +394,7 @@ const ensureWordInTatarSentence = ({ sentenceTat, wordTat, translatedWordCandida
     return "";
 };
 
+// Переводит русский пример на татарский и сохраняет целевое слово.
 const translateRuSentenceToTat = async ({ sentenceRu, wordRu, wordStem, wordTat, timeoutMs, translatedWordCandidate }) => {
     const withToken = replaceFirstRelatedRuWordWithToken(sentenceRu, wordRu, wordStem);
     if (!withToken.includes(WORD_TOKEN)) {
@@ -394,6 +419,7 @@ const translateRuSentenceToTat = async ({ sentenceRu, wordRu, wordStem, wordTat,
     });
 };
 
+// Приводит примеры употребления к безопасному единому формату ответа.
 const normalizeUsageExamples = (examples) => {
     if (!Array.isArray(examples)) {
         return [];
@@ -419,6 +445,7 @@ const normalizeUsageExamples = (examples) => {
     return normalized;
 };
 
+// Собирает самые простые fallback-примеры без внешних сервисов.
 const buildHardFallbackExamples = (wordRu, wordTat) => {
     const w = getRuCases(wordRu);
     return [
@@ -429,6 +456,7 @@ const buildHardFallbackExamples = (wordRu, wordTat) => {
     ];
 };
 
+// Подбирает и переводит примеры употребления для словарного слова.
 export const generateUsageExamplesForWord = async ({ wordRu, wordTatar, excludeExamples = [] }) => {
     const cleanWordRu = lowerFirst(normalizeSpaces(wordRu));
     const cleanWordTat = lowerFirst(normalizeSpaces(wordTatar));

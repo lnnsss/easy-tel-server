@@ -5,11 +5,15 @@ import FormData from "form-data";
 import mongoose from "mongoose";
 import { generateUsageExamplesForWord, normalizeUsageExamples } from "../services/usageExamples.service.js";
 import { buildWordTitleCase } from "../services/wordDescription.service.js";
+import { normalizeMlResults } from "../utils/recognitionLabels.js";
 
 dotenv.config();
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
+// Приводит входные данные к единому безопасному формату.
+const normalizeWordKey = (value) => String(value || "").trim().toLowerCase();
 
+// Генерирует дополнительные примеры употребления для найденного слова.
 export const generateUsageExamples = async (req, res) => {
     try {
         const wordId = String(req.body?.wordId || "").trim();
@@ -47,6 +51,7 @@ export const generateUsageExamples = async (req, res) => {
     }
 };
 
+// Распознает загруженное изображение и сопоставляет ML-метки со словарем.
 export const recognizeImage = async (req, res) => {
     console.log("=== START recognizeImage ===");
 
@@ -60,6 +65,11 @@ export const recognizeImage = async (req, res) => {
         }
 
         const allWords = await Word.find({ isActive: true });
+        const wordsByNameEn = new Map(
+            allWords
+                .map((word) => [normalizeWordKey(word.nameEn), word])
+                .filter(([key]) => Boolean(key))
+        );
 
         // Формируем данные формы.
         const formData = new FormData();
@@ -87,62 +97,18 @@ export const recognizeImage = async (req, res) => {
             });
         }
 
-        // Словарь нормализации прямо в серверной среде.
-        const LABEL_MAP = {
-            "tabby": "Cat",
-            "tabby cat": "Cat",
-            "tiger cat": "Cat",
-            "Egyptian cat": "Cat",
-            "lynx": "Cat",
-            "catamount": "Cat",
-            "banana": "Banana",
-            "plantain": "Banana",
-            "dog": "Dog",
-            "bloodhound": "Dog",
-            "golden retriever": "Dog",
-            "Labrador retriever": "Dog",
-            "orange": "Orange",
-            "apple": "Apple",
-            "computer keyboard": "Keyboard",
-            "keypad": "Keyboard",
-            "computer mouse": "Computer mouse",
-            "mouse": "Mouse",
-            "notebook": "Laptop",
-            "laptop": "Laptop",
-            "screen": "Monitor",
-            "monitor": "Monitor",
-            "web site": "Computer",
-            "desktop computer": "Computer",
-            "printer": "Printer",
-            "scanner": "Scanner",
-            "projector": "Projector",
-            "backpack": "Backpack",
-            "rucksack": "Backpack",
-            "pencil": "Pencil",
-            "ballpoint": "Pen",
-            "ballpoint pen": "Pen",
-            "water bottle": "Bottle",
-            "desk": "Desk",
-            "dining table": "Table",
-            "table": "Table",
-            "bookcase": "Bookshelf",
-            "bookshelf": "Bookshelf"
-        };
+        const normalizedCandidates = normalizeMlResults(mlResult);
+        const labelsFromML = normalizedCandidates.map((item) => item.label);
 
-        // Нормализуем метки.
-        const labelsFromML = mlResult
-            .map((r) => LABEL_MAP[r.label] || r.label)
-            .filter(Boolean);
-
-        console.log("🔍 Нормализованные labels:", labelsFromML);
+        console.log("🔍 Нормализованные labels:", normalizedCandidates);
 
         let foundWord = null;
         let bestScore = 0;
-        for (const label of labelsFromML) {
-            const match = allWords.find((word) => String(word.nameEn || "").trim().toLowerCase() === label.toLowerCase());
+        for (const candidate of normalizedCandidates) {
+            const match = wordsByNameEn.get(normalizeWordKey(candidate.label));
             if (match) {
                 foundWord = match;
-                bestScore = mlResult.find((r) => (LABEL_MAP[r.label] || r.label) === label)?.score || 0;
+                bestScore = candidate.score;
                 break;
             }
         }

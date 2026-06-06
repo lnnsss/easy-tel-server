@@ -13,11 +13,16 @@ const EDUCATION_LEVELS = [
 const TATAR_LEVELS = ['a0', 'a1', 'a2', 'b1', 'b2', 'c1', 'c2', 'native'];
 const TEACHING_LEVELS = ['epg_phase_1', 'epg_phase_2', 'epg_phase_3', 'epg_phase_4', 'epg_phase_5', 'epg_phase_6'];
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeStr = (value, max = 1000) => String(value || '').trim().slice(0, max);
+// Приводит входные данные к единому безопасному формату.
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+// Проверяет условие и возвращает логический результат.
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+// Обрабатывает серверный сценарий escapeRegex.
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Создает сущность и возвращает результат клиенту.
 export const createAuthorRequest = async (req, res) => {
     try {
         if (req.user?.role === 'admin') {
@@ -78,6 +83,7 @@ export const createAuthorRequest = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getMyAuthorRequest = async (req, res) => {
     try {
         const request = await AuthorRoleRequest.findOne({ userId: req.user.id })
@@ -93,6 +99,7 @@ export const getMyAuthorRequest = async (req, res) => {
     }
 };
 
+// Помечает состояние как просмотренное или обработанное.
 export const markAuthorDecisionSeen = async (req, res) => {
     try {
         const request = await AuthorRoleRequest.findOne({
@@ -120,6 +127,7 @@ export const markAuthorDecisionSeen = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getAdminAuthorRequests = async (req, res) => {
     try {
         const page = Math.max(Number(req.query.page) || 1, 1);
@@ -164,6 +172,7 @@ export const getAdminAuthorRequests = async (req, res) => {
     }
 };
 
+// Обрабатывает решение администратора по заявке или материалу.
 export const reviewAuthorRequest = async (req, res) => {
     try {
         const decision = normalizeStr(req.body.decision, 32);

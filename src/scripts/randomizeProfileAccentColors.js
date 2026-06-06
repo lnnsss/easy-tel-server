@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import { pickRandomProfileAccentColor } from '../utils/profileAccentColor.js';
 
+// Выполняет служебный сценарий run для обслуживания данных проекта.
 const run = async () => {
     if (!process.env.MONGO_URI) {
         throw new Error('MONGO_URI is not set');

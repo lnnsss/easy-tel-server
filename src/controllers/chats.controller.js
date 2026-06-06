@@ -13,6 +13,7 @@ import { getIO } from '../socket/index.js';
 
 const CHAT_USER_SELECT = 'username firstName lastName avatarUrl rank';
 
+// Форматирует данные для отображения пользователю.
 const formatUser = (user) => ({
     _id: user._id,
     username: user.username,
@@ -22,6 +23,7 @@ const formatUser = (user) => ({
     rank: user.rank
 });
 
+// Возвращает нужные данные или вычисленное значение.
 const getConversationByIdForUser = async (conversationId, userId) => {
     return Conversation.findOne({
         _id: conversationId,
@@ -29,6 +31,7 @@ const getConversationByIdForUser = async (conversationId, userId) => {
     });
 };
 
+// Обрабатывает серверный сценарий emitUnreadUpdate.
 const emitUnreadUpdate = async (userId, conversationId) => {
     const io = getIO();
     if (!io) return;
@@ -45,6 +48,7 @@ const emitUnreadUpdate = async (userId, conversationId) => {
     });
 };
 
+// Обрабатывает серверный сценарий toMessagePayload.
 const toMessagePayload = (message) => ({
     _id: message._id,
     conversationId: message.conversationId,
@@ -58,6 +62,7 @@ const toMessagePayload = (message) => ({
     createdAt: message.createdAt
 });
 
+// Возвращает нужные данные или вычисленное значение.
 export const getChats = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -131,6 +136,7 @@ export const getChats = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getOrCreateChatWithFriend = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -167,6 +173,7 @@ export const getOrCreateChatWithFriend = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getChatMessages = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -207,6 +214,7 @@ export const getChatMessages = async (req, res) => {
     }
 };
 
+// Отправляет данные во внешний сервис или realtime-канал.
 export const sendVoiceMessage = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -262,6 +270,7 @@ export const sendVoiceMessage = async (req, res) => {
     }
 };
 
+// Помечает состояние как просмотренное или обработанное.
 export const markVoiceMessageListened = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -285,6 +294,7 @@ export const markVoiceMessageListened = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteMessage = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -323,6 +333,7 @@ export const deleteMessage = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteChat = async (req, res) => {
     try {
         const userId = String(req.user.id);
@@ -350,6 +361,7 @@ export const deleteChat = async (req, res) => {
     }
 };
 
+// Помечает состояние как просмотренное или обработанное.
 export const markChatAsRead = async (req, res) => {
     try {
         const userId = String(req.user.id);

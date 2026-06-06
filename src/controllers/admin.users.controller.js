@@ -7,15 +7,19 @@ import CourseTopic from '../models/CourseTopic.js';
 import TopicQuiz from '../models/TopicQuiz.js';
 import AuthorRoleRequest from '../models/AuthorRoleRequest.js';
 
+// Обрабатывает серверный сценарий escapeRegex.
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeSortField = (value) => {
     if (value === 'totalPoints') return 'totalPoints';
     if (value === 'latestRequestAt') return 'latestRequestAt';
     return 'createdAt';
 };
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeSortOrder = (value) => (String(value || '').toLowerCase() === 'asc' ? 1 : -1);
+// Обрабатывает серверный сценарий parseOptionalNumber.
 const parseOptionalNumber = (value) => {
     if (value === undefined || value === null) return null;
     const normalized = String(value).trim();
@@ -24,6 +28,7 @@ const parseOptionalNumber = (value) => {
     return Number.isFinite(parsed) ? parsed : null;
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getUsers = async (req, res) => {
     try {
         const page = Math.max(Number(req.query.page) || 1, 1);
@@ -169,6 +174,7 @@ export const getUsers = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
@@ -207,6 +213,7 @@ export const deleteUser = async (req, res) => {
     }
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateUserRole = async (req, res) => {
     try {
         const { id } = req.params;

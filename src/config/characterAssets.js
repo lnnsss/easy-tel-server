@@ -24,6 +24,7 @@ const __dirname = path.dirname(__filename);
 const customizeRoot = path.resolve(__dirname, '..', '..', '..', 'client', 'public', 'customize');
 const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif|svg)$/i;
 
+// Читает файлы ассетов персонажа из папки конфигурации.
 const readAssetFolder = (folderName) => {
     const folderPath = path.join(customizeRoot, folderName);
     try {
@@ -38,11 +39,13 @@ const readAssetFolder = (folderName) => {
     }
 };
 
+// Выбирает дефолтный ассет персонажа из доступного списка.
 const pickDefault = (files, preferred) => {
     if (preferred && files.includes(preferred)) return preferred;
     return files[0] || '';
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildFreeWhitelist = (filesByCategory) => {
     const result = {};
     for (const category of COSMETIC_CATEGORIES) {
@@ -54,6 +57,7 @@ const buildFreeWhitelist = (filesByCategory) => {
     return result;
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCharacterAssetsConfig = () => {
     const characters = readAssetFolder('characters');
     const shoes = readAssetFolder('shoes');

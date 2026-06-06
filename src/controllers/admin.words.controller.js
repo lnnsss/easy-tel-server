@@ -2,7 +2,9 @@ import Word from '../models/Word.js';
 import UserWord from '../models/UserWord.js';
 import User from '../models/User.js';
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeSpaces = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+// Приводит входные данные к единому безопасному формату.
 const normalizeKey = (value) => normalizeSpaces(value)
     .toLowerCase()
     .replace(/[’']/g, '')
@@ -10,12 +12,14 @@ const normalizeKey = (value) => normalizeSpaces(value)
     .replace(/\s+/g, ' ')
     .trim();
 
+// Обрабатывает серверный сценарий capitalizeFirst.
 const capitalizeFirst = (value) => {
     const clean = normalizeSpaces(value);
     if (!clean) return '';
     return clean.charAt(0).toUpperCase() + clean.slice(1);
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createWord = async (req, res) => {
     try {
         const { nameRu, nameEn, nameTatar, transcription, descriptionRu } = req.body;
@@ -36,6 +40,7 @@ export const createWord = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getWords = async (req, res) => {
     try {
         const { page = 1, limit = 10, search = '' } = req.query; // лимит 10
@@ -72,6 +77,7 @@ export const getWords = async (req, res) => {
     }
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateWord = async (req, res) => {
     try {
         const payload = { ...req.body };
@@ -88,6 +94,7 @@ export const updateWord = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteWord = async (req, res) => {
     try {
         const { id } = req.params;

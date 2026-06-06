@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
     }
 });
 
+// Проверяет запрос в middleware-сценарии fileFilter.
 const fileFilter = (_req, file, cb) => {
     if (String(file.mimetype || '').startsWith('audio/')) return cb(null, true);
     cb(new Error('Поддерживаются только аудиофайлы'));

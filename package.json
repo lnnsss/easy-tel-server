@@ -10,6 +10,8 @@
     "test:empty-text": "node src/tests/test-empty-text.js",
     "test:impossible": "node src/tests/test-impossible-scenario.js",
     "test:ai-chat-translation-explanation": "node src/tests/test-ai-chat-translation-explanation.js",
+    "test:recognition-labels": "node src/tests/test-recognition-labels.js",
+    "words:upsert-recognition": "node src/scripts/upsertRecognitionWords.js",
     "seed:users:one-time": "node src/scripts/seedUsersOneTimeTo20.js",
     "users:randomize-profile-colors": "node src/scripts/randomizeProfileAccentColors.js"
   },

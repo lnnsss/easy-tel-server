@@ -37,6 +37,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsRoot = path.resolve(__dirname, '..', 'uploads');
 
+// Обрабатывает серверный сценарий logAuthError.
 const logAuthError = (action, err, reqBody = {}) => {
     const { password, confirmPassword, code, token, ...safeBody } = reqBody;
     console.error(`[auth:${action}]`, {
@@ -47,27 +48,35 @@ const logAuthError = (action, err, reqBody = {}) => {
     });
 };
 
+// Создает сущность и возвращает результат клиенту.
 const createJwtToken = (user) => jwt.sign(
     { id: user._id, tv: user.tokenVersion || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
 );
 
+// Проверяет наличие нужного состояния или признака.
 const hashString = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
+// Обрабатывает серверный сценарий generateVerificationCode.
 const generateVerificationCode = () => String(Math.floor(100000 + Math.random() * 900000));
 
+// Обрабатывает серверный сценарий generateResetToken.
 const generateResetToken = () => crypto.randomBytes(32).toString('hex');
+// Обрабатывает серверный сценарий generateReferralCode.
 const generateReferralCode = () => crypto.randomBytes(5).toString('hex').toUpperCase();
 
+// Гарантирует наличие нужного состояния перед дальнейшей работой.
 const ensureGoogleConfigured = () => (
     process.env.GOOGLE_CLIENT_ID
     && process.env.GOOGLE_CLIENT_SECRET
     && process.env.GOOGLE_REDIRECT_URI
 );
 
+// Обрабатывает серверный сценарий escapeRegex.
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Обрабатывает серверный сценарий tryRemoveAvatarFile.
 const tryRemoveAvatarFile = (avatarUrl) => {
     if (!avatarUrl || !avatarUrl.startsWith('/uploads/')) return;
     const relativePart = avatarUrl.replace('/uploads/', '');
@@ -79,6 +88,7 @@ const tryRemoveAvatarFile = (avatarUrl) => {
     }
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildUniqueUsername = async (baseUsername) => {
     const safeBase = baseUsername
         .replace(/[^A-Za-z0-9]/g, '')
@@ -99,6 +109,7 @@ const buildUniqueUsername = async (baseUsername) => {
     return finalCandidate;
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildUniqueReferralCode = async () => {
     for (let i = 0; i < 10; i += 1) {
         const code = generateReferralCode();
@@ -108,6 +119,7 @@ const buildUniqueReferralCode = async () => {
     return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.toUpperCase();
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildDefaultOwnedCosmetics = () => {
     const { freeItemsWhitelist } = getCharacterAssetsConfig();
     const result = {};
@@ -125,6 +137,7 @@ const COSMETIC_FIELD_MAP = {
     background: 'backgroundFile'
 };
 
+// Обрабатывает серверный сценарий register.
 export const register = async (req, res) => {
     try {
         const {
@@ -227,6 +240,7 @@ export const register = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий login.
 export const login = async (req, res) => {
     try {
         const { identifier, password } = req.body;
@@ -279,6 +293,7 @@ export const login = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий verifyEmail.
 export const verifyEmail = async (req, res) => {
     try {
         const { code } = req.body;
@@ -316,6 +331,7 @@ export const verifyEmail = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий resendVerificationCode.
 export const resendVerificationCode = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('_id email emailVerified');
@@ -340,6 +356,7 @@ export const resendVerificationCode = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий forgotPassword.
 export const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
@@ -374,6 +391,7 @@ export const forgotPassword = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий resetPassword.
 export const resetPassword = async (req, res) => {
     try {
         const { token, password } = req.body;
@@ -411,6 +429,7 @@ export const resetPassword = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий googleAuthStart.
 export const googleAuthStart = async (req, res) => {
     try {
         if (!ensureGoogleConfigured()) {
@@ -437,6 +456,7 @@ export const googleAuthStart = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий googleAuthCallback.
 export const googleAuthCallback = async (req, res) => {
     try {
         if (!ensureGoogleConfigured()) {
@@ -542,6 +562,7 @@ export const googleAuthCallback = async (req, res) => {
     }
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateProfile = async (req, res) => {
     try {
         const {
@@ -709,6 +730,7 @@ export const updateProfile = async (req, res) => {
     }
 };
 
+// Принимает загруженный файл и возвращает информацию для дальнейшей работы.
 export const uploadAvatar = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: 'Файл не загружен' });
@@ -738,6 +760,7 @@ export const uploadAvatar = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий profile.
 export const profile = async (req, res) => {
     const user = await User.findById(req.user.id)
         .select('-password -emailVerificationCodeHash -passwordResetTokenHash')
@@ -779,6 +802,7 @@ export const profile = async (req, res) => {
     });
 };
 
+// Обрабатывает серверный сценарий characterAssets.
 export const characterAssets = async (_req, res) => {
     const { assets, defaults, freeItemsWhitelist } = getCharacterAssetsConfig();
     return res.json({

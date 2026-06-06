@@ -10,11 +10,13 @@ const TRANSLATE_ENDPOINTS = [
 
 const insecureHttpsAgent = new https.Agent({ rejectUnauthorized: false });
 
+// Определяет, связана ли ошибка запроса с TLS-сертификатом.
 const isTlsCertificateError = (err) => {
     const text = String(err?.message || '').toLowerCase();
     return text.includes('certificate') || text.includes('ssl') || text.includes('tls');
 };
 
+// Достает строку перевода из разных форматов ответа TatSoft.
 const extractTranslation = (payload) => {
     if (typeof payload === 'string') {
         return payload;
@@ -39,6 +41,7 @@ const extractTranslation = (payload) => {
     return null;
 };
 
+// Повторяет запрос TatSoft с небезопасным TLS-агентом при ошибке сертификата.
 const fetchJsonWithOptionalInsecure = async ({ url, options, allowInsecureTls }) => {
     try {
         return await fetch(url, options);
@@ -54,6 +57,7 @@ const fetchJsonWithOptionalInsecure = async ({ url, options, allowInsecureTls })
     }
 };
 
+// Пробует варианты endpoint/body TatSoft и возвращает первый успешный перевод.
 const callTatsoftEndpoint = async ({ endpoint, direction, text, timeoutMs }) => {
     const base = String(process.env.TATSOFT_API_BASE || DEFAULT_BASE).replace(/\/+$/, '');
     const urls = [`${base}${endpoint}`, `${base}${endpoint}/`];
@@ -111,6 +115,7 @@ const callTatsoftEndpoint = async ({ endpoint, direction, text, timeoutMs }) => 
     throw new Error('TatSoft unknown error');
 };
 
+// Берет таймаут TatSoft из окружения и защищает его минимальным значением.
 export const getTatsoftTimeoutMs = () => {
     return Math.max(parseInt(process.env.TATSOFT_TIMEOUT_MS, 10) || DEFAULT_TIMEOUT_MS, 1000);
 };

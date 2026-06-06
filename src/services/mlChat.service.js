@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 const DEFAULT_ML_CHAT_URL = 'http://localhost:8000/chat';
 const DEFAULT_TIMEOUT_MS = 45000;
 
+// Выполняет запрос к ML-сервису с ограничением времени ожидания.
 const withTimeout = async (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -18,6 +19,7 @@ const withTimeout = async (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) =>
     }
 };
 
+// Берет таймаут ML-чата из окружения и защищает его минимальным значением.
 export const getMlChatTimeoutMs = () => {
     const raw = Number.parseInt(String(process.env.ML_CHAT_TIMEOUT_MS || ''), 10);
     if (!Number.isFinite(raw) || raw < 1000) return DEFAULT_TIMEOUT_MS;

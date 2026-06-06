@@ -5,8 +5,10 @@ import UserTopicAttempt from '../models/UserTopicAttempt.js';
 import UserWord from '../models/UserWord.js';
 import { calculateDailyStreak, toDateKey } from './userProgress.js';
 
+// Содержит вспомогательную логику clamp для переиспользования в проекте.
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Math.round(value)));
 
+// Возвращает нужные данные или вычисленное значение.
 export const getUserCourseAnalytics = async (userId) => {
     const [attempts, progresses, courses, categories, userWords] = await Promise.all([
         UserTopicAttempt.find({ userId }).sort({ createdAt: -1 }).lean(),

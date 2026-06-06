@@ -5,6 +5,7 @@ const input = { direction: 'bad-direction', text: '   привет   ' };
 const expectedStatus = 400;
 const expectedMessage = 'Некорректное направление перевода';
 
+// Запускает сценарий проверки из командной строки.
 const run = async () => {
     printHeader('TEST 1: invalid direction should return 400');
     const res = await callTranslate(input);

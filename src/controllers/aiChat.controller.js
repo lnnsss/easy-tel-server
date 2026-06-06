@@ -1,11 +1,12 @@
 import { sendChatToMl } from '../services/mlChat.service.js';
 import Word from '../models/Word.js';
 import { getTatsoftTimeoutMs, translateWithTatsoft } from '../services/tatsoft.service.js';
+import { TRANSLATION_GLOSSARY } from '../utils/translationGlossary.js';
 
 const ALLOWED_ROLES = new Set(['user', 'assistant']);
 const ALLOWED_MODES = new Set(['tutor', 'translate', 'correct']);
 const MAX_MESSAGES = 16;
-const MAX_MESSAGE_CHARS = 1200;
+const MAX_MESSAGE_CHARS = 1500;
 const SYSTEM_PROMPTS = {
     tutor: [
         'Ты — Аиша, AI-тьютор платформы EasyTel.',
@@ -35,11 +36,13 @@ const SYSTEM_PROMPTS = {
     ].join(' ')
 };
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeMode = (value) => {
     const mode = String(value || 'tutor').trim().toLowerCase();
     return ALLOWED_MODES.has(mode) ? mode : 'tutor';
 };
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeLookupWord = (value) => String(value || '')
     .trim()
     .toLowerCase()
@@ -47,6 +50,7 @@ const normalizeLookupWord = (value) => String(value || '')
     .replace(/[!?.,;:()"'`«»]/g, '')
     .replace(/\s+/g, ' ');
 
+// Обрабатывает серверный сценарий stripTranslationHints.
 const stripTranslationHints = (value) => String(value || '')
     .replace(/\b(?:скажи|пожалуйста|объясни|поясни|и\s+объясни|и\s+поясни)\b/giu, ' ')
     .replace(/\b(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и)|английск(?:ом|ий|и))\b/giu, ' ')
@@ -56,6 +60,7 @@ const stripTranslationHints = (value) => String(value || '')
     .replace(/\s+/g, ' ')
     .trim();
 
+// Достает нужное значение из сырого ввода или ответа сервиса.
 const extractTextForTranslation = (text) => {
     const raw = String(text || '').trim();
     if (!raw) return '';
@@ -82,23 +87,29 @@ const extractTextForTranslation = (text) => {
 };
 const extractWordForTranslation = extractTextForTranslation;
 
+// Проверяет условие и возвращает логический результат.
 const isTranslationRequest = (text = '') => (
     /перевод|переведи|перевести|как\s+буд(?:ет|ут)|что\s+значит|как\s+сказать|как\s+перевести/i.test(String(text))
     || /\b(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и))\b/i.test(String(text))
 );
+// Проверяет условие и возвращает логический результат.
 const isTranslationFlow = ({ mode, text }) => mode === 'translate' || isTranslationRequest(text);
+// Обрабатывает серверный сценарий wantsTranslationExplanation.
 const wantsTranslationExplanation = (text = '') => /объясни|поясни|почему|разбор|пояснение/i.test(String(text));
+// Определяет итоговое значение на основе входных данных.
 const resolveTatsoftDirection = (text = '', value = '') => {
     const raw = String(text || '');
     if (/\b(?:на|по)\s+русск(?:ом|ий|и)\b/i.test(raw) || /что\s+значит/i.test(raw)) return 'tat2rus';
     if (/\b(?:на|по)\s+татарск(?:ом|ий|и)\b/i.test(raw)) return 'rus2tat';
     return /[а-яё]/i.test(String(value || '')) ? 'rus2tat' : 'tat2rus';
 };
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildUnknownTranslationReply = (lookupWord) => (
     lookupWord
         ? `Перевод: к сожалению, я не знаю точный перевод ${isSingleLookupWord(lookupWord) ? 'слова' : 'текста'} «${lookupWord}».`
         : 'Перевод: к сожалению, я не смогла выделить слово для точного перевода.'
 );
+// Проверяет условие и возвращает логический результат.
 const isSingleLookupWord = (value) => {
     const normalized = normalizeLookupWord(value);
     if (!normalized) return false;
@@ -111,6 +122,7 @@ const EXPLICIT_RE = /(?:^|[\s,.;:!?])(порно|секс|эротик|нарк�
 const CLEAR_OFFTOP_RE = /(?:^|[\s,.;:!?])(ставк|букмекер|казино|слот|рулетк|гороскоп|приворот|гадани)(?:[\s,.;:!?]|$)/i;
 const OFFTOP_REDIRECT = 'Давайте вернёмся к изучению татарского языка — могу помочь с переводом, грамматикой или практикой.';
 
+// Проверяет условие и возвращает логический результат.
 const isAllowedTopic = (text = '') => {
     const value = String(text || '').trim();
     if (!value) return true;
@@ -123,10 +135,13 @@ const isAllowedTopic = (text = '') => {
     return false;
 };
 
+// Возвращает нужные данные или вычисленное значение.
 const getLatestUserMessage = (messages = []) => [...messages].reverse().find((item) => item.role === 'user');
 
+// Обрабатывает серверный сценарий capitalizeFirstLetter.
 const capitalizeFirstLetter = (value) => String(value || '').replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase('ru-RU'));
 
+// Формирует единый текст ответа с переводом и необязательным разбором.
 export const formatTranslationReply = ({ sourceText, translatedText, direction, explanation = '' }) => {
     const directionText = direction === 'tat2rus' ? 'по-русски' : 'по-татарски';
     const lines = [`Перевод: «${capitalizeFirstLetter(sourceText)}» ${directionText} — «${translatedText}».`];
@@ -134,38 +149,23 @@ export const formatTranslationReply = ({ sourceText, translatedText, direction, 
     return lines.join('\n');
 };
 
-const TRANSLATION_GLOSSARY = [
-    { ru: 'мы', tt: 'без', ruMeaning: 'мы' },
-    { ru: 'мама', tt: 'әни', ruMeaning: 'мама' },
-    { ru: 'я', tt: 'мин', ruMeaning: 'я' },
-    { ru: 'тебя', tt: 'сине', ruMeaning: 'тебя' },
-    { ru: 'ты', tt: 'син', ruMeaning: 'ты' },
-    { ru: 'люблю', tt: 'яратам', ruMeaning: 'люблю' },
-    { ru: 'любить', tt: 'ярату', ruMeaning: 'любить' },
-    { ru: 'с друзьями', tt: 'дуслар белән', ruMeaning: 'с друзьями' },
-    { ru: 'друзьями', tt: 'дуслар', ruMeaning: 'друзья' },
-    { ru: 'на речку', tt: 'елга буена', ruMeaning: 'на речку / к берегу реки' },
-    { ru: 'речку', tt: 'елга буена', ruMeaning: 'на речку / к берегу реки' },
-    { ru: 'поехали', tt: 'киттек', ruMeaning: 'поехали / отправились' },
-    { ru: 'папа', tt: 'әти', ruMeaning: 'папа' },
-    { ru: 'спасибо', tt: 'рәхмәт', ruMeaning: 'спасибо' },
-    { ru: 'здравствуйте', tt: 'исәнмесез', ruMeaning: 'здравствуйте' },
-    { ru: 'привет', tt: 'сәлам', ruMeaning: 'привет' }
-];
-
+// Приводит входные данные к единому безопасному формату.
 const normalizeExplanationToken = (value) => normalizeLookupWord(value).replace(/[^\p{L}\p{N}\s]/gu, '');
 
+// Обрабатывает серверный сценарий includesNormalizedPhrase.
 const includesNormalizedPhrase = (text, phrase) => {
     const normalizedText = ` ${normalizeExplanationToken(text)} `;
     const normalizedPhrase = normalizeExplanationToken(phrase);
     return normalizedPhrase ? normalizedText.includes(` ${normalizedPhrase} `) : false;
 };
 
+// Обрабатывает серверный сценарий findOriginalTranslationToken.
 const findOriginalTranslationToken = (translation, token) => {
     const escaped = String(token || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return String(translation || '').match(new RegExp(escaped, 'iu'))?.[0] || token;
 };
 
+// Удаляет связь или сущность по запросу пользователя.
 const removeOverlappingGlossaryEntries = (entries) => {
     const selected = [];
     const bySpecificity = [...entries].sort((left, right) => {
@@ -191,6 +191,7 @@ const removeOverlappingGlossaryEntries = (entries) => {
     return selected;
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildGrammarNotes = (translation) => {
     const normalized = normalizeExplanationToken(translation);
     const notes = [];
@@ -211,6 +212,7 @@ const buildGrammarNotes = (translation) => {
     return notes;
 };
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildDeterministicTranslationExplanation = ({ sourceText, translatedText, direction }) => {
     const source = String(sourceText || '').trim();
     const translation = String(translatedText || '').trim();
@@ -240,6 +242,7 @@ const buildDeterministicTranslationExplanation = ({ sourceText, translatedText, 
     return `Смысл фразы «${source}» передан готовым вариантом «${translation}» на ${targetLanguageText}. Я не вижу в локальной базе подробного разбора каждого слова, поэтому безопасно поясняю общий смысл, не подменяя перевод другими формами.`;
 };
 
+// Обрабатывает серверный сценарий tryBuildDbTranslationReply.
 const tryBuildDbTranslationReply = async ({ mode, messages }) => {
     const lastUserMessage = getLatestUserMessage(messages);
     const userText = String(lastUserMessage?.content || '').trim();
@@ -276,6 +279,7 @@ const tryBuildDbTranslationReply = async ({ mode, messages }) => {
     return { sourceText: en, translatedText: `${ru}; ${tt}`, direction: 'rus2tat', provider: 'local_dictionary' };
 };
 
+// Обрабатывает серверный сценарий tryBuildTatsoftTranslationReply.
 const tryBuildTatsoftTranslationReply = async ({ mode, messages }) => {
     const lastUserMessage = getLatestUserMessage(messages);
     const userText = String(lastUserMessage?.content || '').trim();
@@ -296,11 +300,13 @@ const tryBuildTatsoftTranslationReply = async ({ mode, messages }) => {
     return translatedText ? { sourceText: lookupWord, translatedText, direction, provider: 'tatsoft' } : null;
 };
 
+// Строит учебный разбор перевода, если пользователь попросил пояснение.
 export const buildTranslationExplanation = ({ sourceText, translatedText, direction, userText }) => {
     if (!wantsTranslationExplanation(userText)) return '';
     return buildDeterministicTranslationExplanation({ sourceText, translatedText, direction });
 };
 
+// Очищает входные данные перед дальнейшей обработкой.
 const sanitizeMessages = (raw) => {
     if (!Array.isArray(raw)) return [];
     const sliced = raw.slice(-MAX_MESSAGES);
@@ -317,6 +323,7 @@ const sanitizeMessages = (raw) => {
         }));
 };
 
+// Обрабатывает сообщение AI-чата и выбирает локальный, TatSoft или ML-ответ.
 export const sendAiChatMessage = async (req, res) => {
     try {
         const mode = normalizeMode(req.body?.mode);

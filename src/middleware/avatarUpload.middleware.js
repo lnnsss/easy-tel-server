@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
     }
 });
 
+// Проверяет запрос в middleware-сценарии imageOnlyFilter.
 const imageOnlyFilter = (_, file, cb) => {
     if (file.mimetype?.startsWith('image/')) return cb(null, true);
     return cb(new Error('Можно загружать только изображения'));

@@ -4,6 +4,7 @@ import {
     pickRandomAvatarAccentColor
 } from './avatarAccentColor.js';
 
+// Содержит вспомогательную логику migrateAvatarAccentColor для переиспользования в проекте.
 export const migrateAvatarAccentColor = async () => {
     const users = await User.find({}).select('_id avatarAccentColor').lean();
     if (!users.length) return;

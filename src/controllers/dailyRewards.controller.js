@@ -7,6 +7,7 @@ import {
 } from '../utils/dailyRewards.js';
 import { addStudyPoints, ensureLegacyPoints, toDateKey } from '../utils/userProgress.js';
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildResponse = ({ user, status }) => ({
     progress: {
         nextDay: status.nextDay,
@@ -23,6 +24,7 @@ const buildResponse = ({ user, status }) => ({
     }
 });
 
+// Возвращает нужные данные или вычисленное значение.
 export const getDailyRewards = async (req, res) => {
     try {
         const [user, config] = await Promise.all([
@@ -45,6 +47,7 @@ export const getDailyRewards = async (req, res) => {
     }
 };
 
+// Выдает пользователю доступную награду.
 export const claimDailyReward = async (req, res) => {
     try {
         const [user, config] = await Promise.all([
@@ -90,6 +93,7 @@ export const claimDailyReward = async (req, res) => {
     }
 };
 
+// Помечает состояние как просмотренное или обработанное.
 export const markDailyRewardModalSeen = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('dailyRewards');

@@ -15,11 +15,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsPath = path.resolve(__dirname, 'uploads');
 
+// Читает числовую настройку окружения с fallback-значением.
 const toInt = (value, fallback) => {
     const parsed = Number.parseInt(String(value ?? ''), 10);
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+// Возвращает нужные данные или вычисленное значение.
 const getLimiterKey = (req) => {
     const authHeader = String(req.headers?.authorization || '');
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
@@ -31,6 +33,7 @@ const getLimiterKey = (req) => {
     return `ip:${ipKeyGenerator(ip)}`;
 };
 
+// Создает сущность и возвращает результат клиенту.
 const createLimiter = ({ windowMs, max, scope }) => rateLimit({
     windowMs,
     max,

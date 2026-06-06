@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 
+// Содержит вспомогательную логику migrateHeaddressDefault для переиспользования в проекте.
 export const migrateHeaddressDefault = async () => {
     const result = await User.updateMany(
         { 'characterCustomization.headdressFile': { $ne: '' } },

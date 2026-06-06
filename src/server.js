@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 5000;
 const server = createServer(app);
 initSocket(server);
 
+// Запускает базу данных, HTTP-сервер и realtime-слой приложения.
 const bootstrap = async () => {
     if (!process.env.MONGO_URI) {
         throw new Error('MONGO_URI is not set');

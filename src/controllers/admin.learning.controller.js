@@ -14,6 +14,7 @@ import {
 } from '../utils/topicContent.js';
 import { normalizeRewardDaysInput } from '../utils/dailyRewards.js';
 
+// Обрабатывает серверный сценарий parseBoolean.
 const parseBoolean = (value, fallback = true) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
@@ -24,6 +25,7 @@ const parseBoolean = (value, fallback = true) => {
     return fallback;
 };
 
+// Приводит входные данные к единому безопасному формату.
 const normalizePinnedMode = (value) => {
     const normalized = String(value || '').trim();
     if (normalized === 'dismiss_once') return 'dismiss_once';
@@ -31,6 +33,7 @@ const normalizePinnedMode = (value) => {
     return 'persistent';
 };
 
+// Приводит входные данные к единому безопасному формату.
 const normalizeCategoryIds = (rawCategoryIds, rawCategoryId) => {
     const source = [];
 
@@ -56,12 +59,14 @@ const normalizeCategoryIds = (rawCategoryIds, rawCategoryId) => {
     return unique;
 };
 
+// Обрабатывает серверный сценарий cloneQuizPayload.
 const cloneQuizPayload = (quizDoc, topicId) => ({
     topicId,
     passingScore: quizDoc.passingScore,
     questions: Array.isArray(quizDoc.questions) ? quizDoc.questions : []
 });
 
+// Собирает данные в формат, удобный для дальнейшего использования.
 const buildTopicReadPayload = (topicDoc) => {
     const topic = topicDoc?.toObject ? topicDoc.toObject() : topicDoc;
     return {
@@ -70,6 +75,7 @@ const buildTopicReadPayload = (topicDoc) => {
     };
 };
 
+// Проверяет условие и возвращает логический результат.
 const isTopicContentValidationError = (message = '') => {
     return message.includes('contentBlocks')
         || message.includes('Добавьте хотя бы один блок контента')
@@ -77,6 +83,7 @@ const isTopicContentValidationError = (message = '') => {
 };
 const SENTENCE_ALLOWED_RE = /^[\p{L}\p{N}\s-]+$/u;
 
+// Проверяет входные данные и возвращает нормализованный результат.
 const validateAndNormalizeQuestions = (questions = []) => {
     if (!Array.isArray(questions) || questions.length === 0) {
         throw new Error('Добавьте хотя бы один вопрос');
@@ -144,6 +151,7 @@ const validateAndNormalizeQuestions = (questions = []) => {
     });
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createCategory = async (req, res) => {
     try {
         const { name, description = '', order = 0, isActive = true } = req.body;
@@ -165,6 +173,7 @@ export const createCategory = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCategories = async (_req, res) => {
     try {
         const categories = await CourseCategory.find().sort({ order: 1, createdAt: 1 });
@@ -175,6 +184,7 @@ export const getCategories = async (_req, res) => {
     }
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateCategory = async (req, res) => {
     try {
         const payload = { ...req.body };
@@ -191,6 +201,7 @@ export const updateCategory = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteCategory = async (req, res) => {
     try {
         const coursesCount = await Course.countDocuments({
@@ -211,6 +222,7 @@ export const deleteCategory = async (req, res) => {
     }
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createCourse = async (req, res) => {
     try {
         const {
@@ -271,6 +283,7 @@ export const createCourse = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getCoursesAdmin = async (_req, res) => {
     try {
         const courses = await Course.find({
@@ -291,6 +304,7 @@ export const getCoursesAdmin = async (_req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий applyRevisionToSourceCourse.
 const applyRevisionToSourceCourse = async (revisionCourse, adminId, adminComment = '') => {
     const sourceCourse = await Course.findById(revisionCourse.sourceCourseId);
     if (!sourceCourse) {
@@ -376,6 +390,7 @@ const applyRevisionToSourceCourse = async (revisionCourse, adminId, adminComment
     return sourceCourse;
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateCourse = async (req, res) => {
     try {
         const payload = { ...req.body };
@@ -422,6 +437,7 @@ export const updateCourse = async (req, res) => {
     }
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteCourse = async (req, res) => {
     try {
         const topics = await CourseTopic.find({ courseId: req.params.id }).select('_id');
@@ -440,6 +456,7 @@ export const deleteCourse = async (req, res) => {
     }
 };
 
+// Создает сущность и возвращает результат клиенту.
 export const createTopic = async (req, res) => {
     try {
         const { courseId, title, content, contentBlocks, order = 0, status = 'draft' } = req.body;
@@ -482,6 +499,7 @@ export const createTopic = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getTopicsAdmin = async (req, res) => {
     try {
         const query = req.query.courseId ? { courseId: req.query.courseId } : {};
@@ -493,6 +511,7 @@ export const getTopicsAdmin = async (req, res) => {
     }
 };
 
+// Обновляет сущность по данным из запроса.
 export const updateTopic = async (req, res) => {
     try {
         const payload = { ...req.body };
@@ -521,6 +540,7 @@ export const updateTopic = async (req, res) => {
     }
 };
 
+// Принимает загруженный файл и возвращает информацию для дальнейшей работы.
 export const uploadTopicImage = async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'Файл изображения обязателен' });
@@ -531,6 +551,7 @@ export const uploadTopicImage = async (req, res) => {
     });
 };
 
+// Удаляет сущность и связанные данные, если это требуется.
 export const deleteTopic = async (req, res) => {
     try {
         await TopicQuiz.deleteOne({ topicId: req.params.id });
@@ -553,6 +574,7 @@ export const deleteTopic = async (req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий upsertTopicQuiz.
 export const upsertTopicQuiz = async (req, res) => {
     try {
         const topicId = req.params.topicId || req.body.topicId;
@@ -582,6 +604,7 @@ export const upsertTopicQuiz = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getTopicQuizAdmin = async (req, res) => {
     try {
         const quiz = await TopicQuiz.findOne({ topicId: req.params.topicId });
@@ -593,6 +616,7 @@ export const getTopicQuizAdmin = async (req, res) => {
     }
 };
 
+// Обрабатывает решение администратора по заявке или материалу.
 export const reviewCourse = async (req, res) => {
     try {
         const decision = String(req.body.decision || '').trim();
@@ -665,6 +689,7 @@ export const reviewCourse = async (req, res) => {
     }
 };
 
+// Возвращает нужные данные или вычисленное значение.
 export const getDailyRewardConfigAdmin = async (_req, res) => {
     try {
         let config = await DailyRewardConfig.findOne({ key: 'default' });
@@ -684,6 +709,7 @@ export const getDailyRewardConfigAdmin = async (_req, res) => {
     }
 };
 
+// Обрабатывает серверный сценарий upsertDailyRewardConfigAdmin.
 export const upsertDailyRewardConfigAdmin = async (req, res) => {
     try {
         const days = normalizeRewardDaysInput(req.body?.days || []);

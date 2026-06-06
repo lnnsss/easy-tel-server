@@ -15,10 +15,12 @@ const AVATAR_ACCENT_COLORS = [
     '#ad1457'
 ];
 
+// Выбирает случайный акцентный цвет аватара из разрешенной палитры.
 export const pickRandomAvatarAccentColor = () => (
     AVATAR_ACCENT_COLORS[Math.floor(Math.random() * AVATAR_ACCENT_COLORS.length)]
 );
 
+// Проверяет, что цвет аватара входит в разрешенную палитру.
 export const isValidAvatarAccentColor = (value) => (
     typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
 );

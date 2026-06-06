@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import { ensureLegacyPoints } from './userProgress.js';
 import { COSMETIC_CATEGORIES, getCharacterAssetsConfig } from '../config/characterAssets.js';
 
+// Содержит вспомогательную логику migrateUserPoints для переиспользования в проекте.
 export const migrateUserPoints = async () => {
     const { freeItemsWhitelist } = getCharacterAssetsConfig();
     const users = await User.find().select('_id dictionary scanPoints studyPoints totalPoints rank coins ownedCosmetics');

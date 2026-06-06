@@ -4,21 +4,26 @@ const AI_TIMEOUT_MS = Number(process.env.WORD_DESCRIPTION_AI_TIMEOUT_MS || 5500)
 
 const descriptionCache = new Map();
 
+// Нормализует пробелы, чтобы дальнейшие проверки работали стабильно.
 const normalizeSpaces = (value) => String(value || "").replace(/\s+/g, " ").trim();
+// Нормализует строку в ключ для устойчивого сравнения.
 const normalizeKey = (value) => normalizeSpaces(value).toLowerCase();
 
+// Приводит первую букву строки к верхнему регистру.
 const capitalizeFirst = (value) => {
     const clean = normalizeSpaces(value);
     if (!clean) return "";
     return clean.charAt(0).toUpperCase() + clean.slice(1);
 };
 
+// Очищает описание слова от лишних пробелов и служебного текста.
 const cleanDescription = (value) => normalizeSpaces(
     String(value || "")
         .replace(/^["'`]+|["'`]+$/g, "")
         .replace(/\s+/g, " ")
 );
 
+// Проверяет, достаточно ли описание похоже на полезное объяснение.
 const looksLikeRichDescription = (value) => {
     const text = cleanDescription(value);
     if (!text) return false;
@@ -28,6 +33,7 @@ const looksLikeRichDescription = (value) => {
     return /[.!?]/.test(text);
 };
 
+// Создает базовое описание слова, когда AI-описание недоступно.
 const fallbackDescription = ({ wordRu, wordTatar }) => {
     const ru = capitalizeFirst(wordRu || "Это слово");
     const tat = capitalizeFirst(wordTatar || "");
@@ -51,6 +57,7 @@ const RICH_FALLBACK_BY_EN = new Map(Object.entries({
     list: "Список — это упорядоченный набор пунктов, записанных в определенной последовательности для удобства восприятия и работы. Обычно списки используют для планирования задач, фиксации покупок, ведения учета или структурирования информации в документах. Они помогают быстро видеть приоритеты, не забывать важные детали и отслеживать прогресс. В цифровой среде списки часто дополняют отметками выполнения, фильтрами и сортировкой."
 }));
 
+// Собирает промпт для генерации понятного описания слова.
 const buildPrompt = ({ wordRu, wordTatar, wordEn }) => {
     const ru = capitalizeFirst(wordRu);
     const tat = capitalizeFirst(wordTatar);
@@ -67,6 +74,7 @@ const buildPrompt = ({ wordRu, wordTatar, wordEn }) => {
     ].join(" ");
 };
 
+// Запрашивает у AI-сервиса подробное описание слова.
 const generateWithAi = async ({ wordRu, wordTatar, wordEn }) => {
     try {
         const response = await sendChatToMl({
@@ -90,8 +98,10 @@ const generateWithAi = async ({ wordRu, wordTatar, wordEn }) => {
     }
 };
 
+// Готовит английское название слова в формате Title Case.
 export const buildWordTitleCase = (value) => capitalizeFirst(value);
 
+// Возвращает готовое или заново сгенерированное описание слова.
 export const resolveRichDescription = async ({ wordId, wordRu, wordTatar, wordEn, existingDescription }) => {
     const cacheKey = String(wordId || `${wordRu}::${wordTatar}::${wordEn}`);
     if (descriptionCache.has(cacheKey)) {

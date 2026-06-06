@@ -19,8 +19,11 @@ import { getRank } from '../utils/ranking.js';
 const TARGET_USERS = 20;
 const TOPIC_STUDY_POINTS = 3;
 
+// Выполняет служебный сценарий randomInt для обслуживания данных проекта.
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+// Выполняет служебный сценарий pick для обслуживания данных проекта.
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// Выполняет служебный сценарий sample для обслуживания данных проекта.
 const sample = (arr, size) => {
     const next = [...arr];
     for (let i = next.length - 1; i > 0; i -= 1) {
@@ -29,19 +32,23 @@ const sample = (arr, size) => {
     }
     return next.slice(0, Math.max(0, Math.min(size, next.length)));
 };
+// Выполняет служебный сценарий chance для обслуживания данных проекта.
 const chance = (value) => Math.random() < value;
 
 const FIRST_NAMES = ['Алина', 'Ильдар', 'Лейсан', 'Тимур', 'Сафия', 'Руслан', 'Милана', 'Камиль', 'Элина', 'Артур', 'Ясмина', 'Данияр', 'Азалия', 'Ринат'];
 const LAST_NAMES = ['Ахметова', 'Сафин', 'Нигматуллина', 'Гареев', 'Сулейманова', 'Гильманов', 'Закирова', 'Муртазин', 'Фатхутдинова', 'Юсупов'];
 
+// Выполняет служебный сценарий makeReadablePassword для обслуживания данных проекта.
 const makeReadablePassword = () => {
     const head = crypto.randomBytes(4).toString('hex');
     const tail = randomInt(10, 99);
     return `EasyTel_${head}${tail}`;
 };
 
+// Выполняет служебный сценарий makeReferralCode для обслуживания данных проекта.
 const makeReferralCode = () => `REF${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
+// Выполняет служебный сценарий dateDaysAgo для обслуживания данных проекта.
 const dateDaysAgo = (daysAgo, jitterHours = 20) => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - daysAgo);
@@ -49,6 +56,7 @@ const dateDaysAgo = (daysAgo, jitterHours = 20) => {
     return d;
 };
 
+// Выполняет служебный сценарий buildLoginDays для обслуживания данных проекта.
 const buildLoginDays = (streakDays, extraDays = 0) => {
     const days = [];
     for (let i = streakDays - 1; i >= 0; i -= 1) {
@@ -64,6 +72,7 @@ const buildLoginDays = (streakDays, extraDays = 0) => {
     return [...new Set(days)].sort();
 };
 
+// Выполняет служебный сценарий buildWordAddDays для обслуживания данных проекта.
 const buildWordAddDays = (wordsCount, streakDays) => {
     const days = [];
     const denseDays = Math.max(3, Math.min(streakDays, 10));
@@ -76,6 +85,7 @@ const buildWordAddDays = (wordsCount, streakDays) => {
     return [...new Set(days)].sort();
 };
 
+// Выполняет служебный сценарий buildTestDays для обслуживания данных проекта.
 const buildTestDays = (attemptsCount, streakCandidate = 0) => {
     const days = [];
     const streakLen = Math.min(streakCandidate, 30);
@@ -91,6 +101,7 @@ const buildTestDays = (attemptsCount, streakCandidate = 0) => {
     return [...new Set(days)].sort();
 };
 
+// Выполняет служебный сценарий ensureDb для обслуживания данных проекта.
 const ensureDb = async () => {
     if (!process.env.MONGO_URI) {
         throw new Error('MONGO_URI is not set');
@@ -98,6 +109,7 @@ const ensureDb = async () => {
     await mongoose.connect(process.env.MONGO_URI);
 };
 
+// Выполняет служебный сценарий createMissingUsers для обслуживания данных проекта.
 const createMissingUsers = async (existingUsers) => {
     const missing = TARGET_USERS - existingUsers.length;
     if (missing <= 0) return [];
@@ -149,6 +161,7 @@ const createMissingUsers = async (existingUsers) => {
     return created;
 };
 
+// Выполняет служебный сценарий clearUserLearningState для обслуживания данных проекта.
 const clearUserLearningState = async (userIds) => {
     await Promise.all([
         UserWord.deleteMany({ user: { $in: userIds } }),
@@ -197,6 +210,7 @@ const clearUserLearningState = async (userIds) => {
     );
 };
 
+// Выполняет служебный сценарий getContentPool для обслуживания данных проекта.
 const getContentPool = async () => {
     const [words, courses, topics, quizzes] = await Promise.all([
         Word.find({ isActive: true }).select('_id').lean(),
@@ -235,6 +249,7 @@ const getContentPool = async () => {
     };
 };
 
+// Выполняет служебный сценарий pickPersona для обслуживания данных проекта.
 const pickPersona = () => {
     const roll = Math.random();
     if (roll < 0.35) return { label: 'newbie', words: [6, 20], courses: [0, 1], streak: [1, 5], attempts: [3, 12] };
@@ -242,6 +257,7 @@ const pickPersona = () => {
     return { label: 'active', words: [55, 100], courses: [1, 2], streak: [10, 35], attempts: [20, 45] };
 };
 
+// Выполняет служебный сценарий seedUserProgress для обслуживания данных проекта.
 const seedUserProgress = async (user, pool) => {
     const persona = pickPersona();
     const wordsCount = Math.min(pool.words.length, randomInt(persona.words[0], persona.words[1]));
@@ -388,6 +404,7 @@ const seedUserProgress = async (user, pool) => {
     };
 };
 
+// Выполняет служебный сценарий seedFriendships для обслуживания данных проекта.
 const seedFriendships = async (users) => {
     const ids = users.map((u) => String(u._id));
     const edges = new Set();
@@ -439,6 +456,7 @@ const seedFriendships = async (users) => {
     return { friendships: friendshipDocs.length, requests: pendingRequests.length };
 };
 
+// Запускает приложение и подключает React к корневому DOM-узлу.
 const main = async () => {
     await ensureDb();
 

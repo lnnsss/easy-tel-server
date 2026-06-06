@@ -6,8 +6,10 @@ import { ensureLegacyPoints, normalizeUserStreak } from '../utils/userProgress.j
 import { normalizeUserPair } from '../utils/socialGraph.js';
 import { getUserCourseAnalytics } from '../utils/courseAnalytics.js';
 
+// Обрабатывает серверный сценарий escapeRegex.
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Возвращает нужные данные или вычисленное значение.
 export const getPublicProfileByUsername = async (req, res) => {
     try {
         const username = String(req.params.username || '').trim();

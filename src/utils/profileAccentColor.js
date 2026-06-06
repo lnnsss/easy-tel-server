@@ -13,6 +13,7 @@ const PROFILE_ACCENT_COLORS = [
     '#ff922b'
 ];
 
+// Содержит вспомогательную логику pickRandomProfileAccentColor для переиспользования в проекте.
 export const pickRandomProfileAccentColor = () => (
     PROFILE_ACCENT_COLORS[Math.floor(Math.random() * PROFILE_ACCENT_COLORS.length)]
 );
