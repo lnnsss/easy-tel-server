@@ -50,10 +50,34 @@ const normalizeLookupWord = (value) => String(value || '')
     .replace(/[!?.,;:()"'`«»]/g, '')
     .replace(/\s+/g, ' ');
 
+const TATAR_SPECIFIC_LETTER_RE = /[әөүҗңһ]/iu;
+const TATAR_GLOSSARY_TOKENS = new Set(TRANSLATION_GLOSSARY
+    .flatMap((entry) => normalizeLookupWord(entry.tt).split(' '))
+    .filter(Boolean));
+
+const looksLikeTatarText = (value = '') => {
+    const normalized = normalizeLookupWord(value);
+    if (!normalized) return false;
+    if (TATAR_SPECIFIC_LETTER_RE.test(normalized)) return true;
+
+    const tokens = normalized.split(' ').filter(Boolean);
+    return Boolean(tokens.length) && tokens.every((token) => TATAR_GLOSSARY_TOKENS.has(token));
+};
+
+const RU_TARGET_RE = /(?:^|[^\p{L}\p{N}_])(?:на\s+русский|на\s+русском|по-?русски)(?=$|[^\p{L}\p{N}_])/iu;
+const TT_TARGET_RE = /(?:^|[^\p{L}\p{N}_])(?:на\s+татарский|на\s+татарском|по-?татарски)(?=$|[^\p{L}\p{N}_])/iu;
+const RU_SOURCE_RE = /(?:^|[^\p{L}\p{N}_])с\s+русского(?:\s+языка)?(?=$|[^\p{L}\p{N}_])/iu;
+const TT_SOURCE_RE = /(?:^|[^\p{L}\p{N}_])с\s+татарского(?:\s+языка)?(?=$|[^\p{L}\p{N}_])/iu;
+
 // Обрабатывает серверный сценарий stripTranslationHints.
 const stripTranslationHints = (value) => String(value || '')
     .replace(/\b(?:скажи|пожалуйста|объясни|поясни|и\s+объясни|и\s+поясни)\b/giu, ' ')
-    .replace(/\b(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и)|английск(?:ом|ий|и))\b/giu, ' ')
+    .replace(TT_SOURCE_RE, ' ')
+    .replace(RU_SOURCE_RE, ' ')
+    .replace(TT_TARGET_RE, ' ')
+    .replace(RU_TARGET_RE, ' ')
+    .replace(/(?:^|[^\p{L}\p{N}_])с\s+английского(?:\s+языка)?(?=$|[^\p{L}\p{N}_])/giu, ' ')
+    .replace(/(?:^|[^\p{L}\p{N}_])(?:на\s+английский|на\s+английском|по-?английски)(?=$|[^\p{L}\p{N}_])/giu, ' ')
     .replace(/\b(?:татарча|русча)\b/giu, ' ')
     .replace(/\b(?:будет|будут|переводится|переводятся|значит|означает)\b/giu, ' ')
     .replace(/\b(?:слово|фразу|фраза)\b/giu, ' ')
@@ -90,18 +114,21 @@ const extractWordForTranslation = extractTextForTranslation;
 // Проверяет условие и возвращает логический результат.
 const isTranslationRequest = (text = '') => (
     /перевод|переведи|перевести|как\s+буд(?:ет|ут)|что\s+значит|как\s+сказать|как\s+перевести/i.test(String(text))
-    || /\b(?:на|по)\s+(?:татарск(?:ом|ий|и)|русск(?:ом|ий|и))\b/i.test(String(text))
+    || RU_TARGET_RE.test(String(text))
+    || TT_TARGET_RE.test(String(text))
 );
 // Проверяет условие и возвращает логический результат.
 const isTranslationFlow = ({ mode, text }) => mode === 'translate' || isTranslationRequest(text);
 // Обрабатывает серверный сценарий wantsTranslationExplanation.
 const wantsTranslationExplanation = (text = '') => /объясни|поясни|почему|разбор|пояснение/i.test(String(text));
 // Определяет итоговое значение на основе входных данных.
-const resolveTatsoftDirection = (text = '', value = '') => {
+export const resolveTatsoftDirection = (text = '', value = '') => {
     const raw = String(text || '');
-    if (/\b(?:на|по)\s+русск(?:ом|ий|и)\b/i.test(raw) || /что\s+значит/i.test(raw)) return 'tat2rus';
-    if (/\b(?:на|по)\s+татарск(?:ом|ий|и)\b/i.test(raw)) return 'rus2tat';
-    return /[а-яё]/i.test(String(value || '')) ? 'rus2tat' : 'tat2rus';
+    if (RU_TARGET_RE.test(raw) || /что\s+значит/i.test(raw)) return 'tat2rus';
+    if (TT_TARGET_RE.test(raw)) return 'rus2tat';
+    if (TT_SOURCE_RE.test(raw)) return 'tat2rus';
+    if (RU_SOURCE_RE.test(raw)) return 'rus2tat';
+    return looksLikeTatarText(value) ? 'tat2rus' : 'rus2tat';
 };
 // Собирает данные в формат, удобный для дальнейшего использования.
 const buildUnknownTranslationReply = (lookupWord) => (

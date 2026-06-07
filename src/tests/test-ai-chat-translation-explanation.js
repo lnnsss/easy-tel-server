@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildTranslationExplanation, formatTranslationReply } from '../controllers/aiChat.controller.js';
+import { buildTranslationExplanation, formatTranslationReply, resolveTatsoftDirection } from '../controllers/aiChat.controller.js';
 import { printHeader } from './helpers.js';
 
 // Запускает сценарий проверки из командной строки.
@@ -51,6 +51,47 @@ const run = () => {
 
     assert.match(formattedReply, /^Перевод: «Мы с друзьями поехали на речку» по-татарски/m, 'Reply should capitalize the source phrase');
     assert.doesNotMatch(formattedReply, /Пояснение:/, 'Reply should not add an extra "Пояснение" label before the structured breakdown');
+
+    assert.equal(
+        resolveTatsoftDirection('переведи рәхмәт', 'рәхмәт'),
+        'tat2rus',
+        'Tatar words with specific letters should translate to Russian'
+    );
+    assert.equal(
+        resolveTatsoftDirection('переведи мин сине яратам', 'мин сине яратам'),
+        'tat2rus',
+        'Known Tatar phrases without specific letters should translate to Russian'
+    );
+    assert.equal(
+        resolveTatsoftDirection('переведи мама я тебя люблю', 'мама я тебя люблю'),
+        'rus2tat',
+        'Russian Cyrillic phrases should still translate to Tatar'
+    );
+    assert.equal(
+        resolveTatsoftDirection('как по-татарски спасибо', 'спасибо'),
+        'rus2tat',
+        'Explicit Tatar target should override language detection'
+    );
+    assert.equal(
+        resolveTatsoftDirection('переведи с татарского рәхмәт', 'рәхмәт'),
+        'tat2rus',
+        'Explicit Tatar source should translate to Russian'
+    );
+    assert.equal(
+        resolveTatsoftDirection('переведи с русского спасибо', 'спасибо'),
+        'rus2tat',
+        'Explicit Russian source should translate to Tatar'
+    );
+    assert.equal(
+        resolveTatsoftDirection('переведи на русский слово "сандугач"', 'сандугач'),
+        'tat2rus',
+        'Explicit Russian target should translate Tatar-looking words to Russian'
+    );
+    assert.equal(
+        resolveTatsoftDirection('переведи с татарского на русский слово "сандугач"', 'сандугач'),
+        'tat2rus',
+        'Explicit Tatar source plus Russian target should translate to Russian'
+    );
 
     const dayExplanation = buildTranslationExplanation({
         sourceText: 'Бүген көн бик матур.',
